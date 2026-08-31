@@ -110,6 +110,17 @@ async def upstream_timeout_handler(request: Request, exc: UpstreamTimeoutError):
 
 @app.exception_handler(UpstreamProviderError)
 async def upstream_provider_handler(request: Request, exc: UpstreamProviderError):
+    # 429 from upstream → surface as 503 Service Unavailable, NOT as 502
+    if exc.status_code == 429:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "error_type": "WeatherProviderRateLimited",
+                "detail": str(exc.message),
+                "provider": exc.provider,
+                "hint": "The weather data provider is temporarily rate-limiting requests. Please wait ~60 seconds and retry."
+            },
+        )
     return JSONResponse(
         status_code=status.HTTP_502_BAD_GATEWAY,
         content={"error_type": "UpstreamProviderError", "detail": str(exc.message), "provider": exc.provider},

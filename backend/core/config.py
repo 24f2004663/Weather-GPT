@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     HTTP_MAX_RETRIES: int = Field(default=2, env="HTTP_MAX_RETRIES")
 
     # Cache TTLs (in seconds)
-    WEATHER_CACHE_TTL_SECONDS: int = Field(default=600, env="WEATHER_CACHE_TTL_SECONDS")       # 10 mins
+    WEATHER_CACHE_TTL_SECONDS: int = Field(default=900, env="WEATHER_CACHE_TTL_SECONDS")       # 15 mins
     GEOCODING_CACHE_TTL_SECONDS: int = Field(default=86400, env="GEOCODING_CACHE_TTL_SECONDS")   # 24 hours
     CLIMATE_CACHE_TTL_SECONDS: int = Field(default=604800, env="CLIMATE_CACHE_TTL_SECONDS")    # 7 days
     ALERT_CACHE_TTL_SECONDS: int = Field(default=300, env="ALERT_CACHE_TTL_SECONDS")          # 5 mins

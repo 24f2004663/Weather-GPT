@@ -78,6 +78,12 @@ export async function getWeatherForecast(
     cache: 'no-store',
   });
   if (!res.ok) {
+    if (res.status === 503) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        body.hint || 'Weather data temporarily unavailable (rate limit). Please wait a moment and retry.'
+      );
+    }
     throw new Error(`Weather fetch failed: HTTP ${res.status}`);
   }
   return await res.json();
@@ -91,6 +97,12 @@ export async function getWeatherByCity(city: string, days: number = 7): Promise<
     cache: 'no-store',
   });
   if (!res.ok) {
+    if (res.status === 503) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        body.hint || 'Weather data temporarily unavailable (rate limit). Please wait a moment and retry.'
+      );
+    }
     throw new Error(`Weather by city failed: HTTP ${res.status}`);
   }
   return await res.json();

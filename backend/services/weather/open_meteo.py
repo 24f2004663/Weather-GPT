@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 import httpx
@@ -12,6 +13,9 @@ from backend.core.errors import (
     InvalidCoordinatesError,
 )
 from backend.services.weather.base import BaseWeatherProvider
+
+# In-flight deduplication: prevents concurrent identical requests from all hitting Open-Meteo simultaneously
+_inflight_weather: Dict[str, asyncio.Event] = {}
 from backend.services.weather.wmo_codes import decode_wmo_code
 from backend.schemas.location import LocationResult
 from backend.schemas.weather import (
@@ -133,6 +137,25 @@ class OpenMeteoProvider(BaseWeatherProvider):
             resp.cached = True
             return resp
 
+        # In-flight deduplication: if another coroutine is already fetching this exact request,
+        # wait for it to finish and then serve from cache.
+        if cache_key in _inflight_weather:
+            logger.debug(f"In-flight dedup WAIT for weather at ({lat}, {lon})")
+            try:
+                await asyncio.wait_for(_inflight_weather[cache_key].wait(), timeout=30.0)
+            except asyncio.TimeoutError:
+                logger.warning(f"In-flight dedup wait timed out for ({lat}, {lon}), proceeding independently")
+            # Try cache again after waiting
+            cached_data = await cache.get(cache_key)
+            if cached_data is not None:
+                resp = NormalizedWeatherResponse(**cached_data)
+                resp.cached = True
+                return resp
+
+        # Register in-flight event to deduplicate concurrent requests
+        inflight_event = asyncio.Event()
+        _inflight_weather[cache_key] = inflight_event
+
         # Build Open-Meteo query parameters
         hourly_vars = [
             "temperature_2m",
@@ -176,33 +199,53 @@ class OpenMeteoProvider(BaseWeatherProvider):
         endpoint = f"{self.base_url}/forecast"
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(endpoint, params=params)
-        except httpx.TimeoutException:
-            logger.error(f"Timeout fetching forecast from Open-Meteo at ({lat}, {lon})")
-            raise UpstreamTimeoutError(provider="Open-Meteo Forecast", timeout_seconds=self.timeout)
-        except Exception as e:
-            logger.error(f"Network error connecting to Open-Meteo Forecast: {str(e)}")
-            raise UpstreamProviderError(provider="Open-Meteo Forecast", status_code=None, message=str(e))
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.get(endpoint, params=params)
+            except httpx.TimeoutException:
+                logger.error(f"Timeout fetching forecast from Open-Meteo at ({lat}, {lon})")
+                raise UpstreamTimeoutError(provider="Open-Meteo Forecast", timeout_seconds=self.timeout)
+            except Exception as e:
+                logger.error(f"Network error connecting to Open-Meteo Forecast: {str(e)}")
+                raise UpstreamProviderError(provider="Open-Meteo Forecast", status_code=None, message=str(e))
 
-        if response.status_code != 200:
-            logger.error(f"Open-Meteo Forecast HTTP {response.status_code}: {response.text}")
-            raise UpstreamProviderError(
-                provider="Open-Meteo Forecast",
-                status_code=response.status_code,
-                message=f"Weather service returned status {response.status_code}"
-            )
+            # Explicit 429 Rate-Limit handling — do not surface as unexplained 502
+            if response.status_code == 429:
+                retry_after = response.headers.get("Retry-After", "unknown")
+                logger.warning(f"Open-Meteo rate-limited (HTTP 429) for ({lat}, {lon}). Retry-After: {retry_after}")
+                raise UpstreamProviderError(
+                    provider="Open-Meteo Forecast",
+                    status_code=429,
+                    message=(
+                        f"Weather provider rate-limited (HTTP 429). "
+                        f"Please retry in {retry_after} seconds. This usually resolves within 1 minute."
+                    )
+                )
 
-        try:
-            raw = response.json()
-        except Exception as e:
-            raise UpstreamProviderError(provider="Open-Meteo Forecast", status_code=200, message="Malformed JSON response from weather service")
+            if response.status_code != 200:
+                logger.error(f"Open-Meteo Forecast HTTP {response.status_code}: {response.text}")
+                raise UpstreamProviderError(
+                    provider="Open-Meteo Forecast",
+                    status_code=response.status_code,
+                    message=f"Weather service returned status {response.status_code}"
+                )
 
-        normalized = self._normalize_open_meteo_payload(raw, lat, lon, location_meta)
-        
-        # Cache normalized result
-        await cache.set(cache_key, normalized.dict(), ttl_seconds=settings.WEATHER_CACHE_TTL_SECONDS)
-        return normalized
+            try:
+                raw = response.json()
+            except Exception as e:
+                raise UpstreamProviderError(provider="Open-Meteo Forecast", status_code=200, message="Malformed JSON response from weather service")
+
+            normalized = self._normalize_open_meteo_payload(raw, lat, lon, location_meta)
+
+            # Cache normalized result with 15-minute TTL
+            await cache.set(cache_key, normalized.dict(), ttl_seconds=settings.WEATHER_CACHE_TTL_SECONDS)
+            return normalized
+
+        finally:
+            # Always release the in-flight lock so waiting coroutines can proceed
+            if cache_key in _inflight_weather:
+                _inflight_weather[cache_key].set()
+                del _inflight_weather[cache_key]
 
     def _normalize_open_meteo_payload(
         self,
