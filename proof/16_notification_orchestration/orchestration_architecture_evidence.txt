@@ -1,0 +1,27 @@
+NOTIFICATION ORCHESTRATION & EVENT BUS PROOF
+============================================================
+Pipeline Architecture:
+SACHET RSS Feed -> CAP Ingestion -> AlertEventBus -> NotificationOrchestrator -> Channel Adapters
+
+1. Provider Status & Safety Safeguards (GET /api/notifications/providers/status):
+HTTP Status: 200
+Response:
+{
+  "channels": {
+    "WHATSAPP": "DRY_RUN",
+    "SMS": "DRY_RUN",
+    "VOICE_IVR": "DRY_RUN",
+    "WEB_PUSH": "DRY_RUN"
+  },
+  "dry_run_enabled": true,
+  "live_tests_enabled": false,
+  "subscription_store_mode": "in_memory_prototype",
+  "idempotency_store_mode": "in_memory_prototype_24h",
+  "restart_persistence": false
+}
+
+2. Invariants Enforced:
+- 24-Hour Idempotency: Duplicate alerts to the same user/channel within 24 hours are suppressed.
+- Rate Limiting: Configurable cap (default 5 alerts/recipient/hour).
+- Fault Isolation: Failure in SMS adapter does not block Voice IVR or Web Push dispatch.
+- Clean Opt-Out: Immediate suppression upon deletion of preferences.

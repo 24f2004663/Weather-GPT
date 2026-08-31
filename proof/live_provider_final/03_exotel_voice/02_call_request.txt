@@ -1,0 +1,7 @@
+EXOTEL VOICE LIVE CALL REQUEST METADATA
+============================================================
+Endpoint: https://api.exotel.com.exotel.com/v1/Accounts/weathergpt2/Calls/connect.json
+Caller ID: 095 1388 ****63
+Recipient: +91 9042 ****20
+Spoken Script: This is a WeatherGPT integration test. No action is required.
+Timestamp: 2026-08-30T15:23:29.139950Z

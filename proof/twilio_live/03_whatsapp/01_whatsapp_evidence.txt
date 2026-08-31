@@ -1,0 +1,9 @@
+TWILIO LIVE WHATSAPP VERIFICATION EVIDENCE
+============================================================
+Endpoint: https://api.twilio.com/2010-04-01/Accounts/***/Messages.json
+Sender (From): +17 3725 ****34
+Recipient (To): +91 9042 ****20
+Adapter Status: NotificationStatus.FAILED
+Twilio Message SID: None
+Error Detail: Twilio WhatsApp API error 21654: ContentSid Required
+Timestamp: 2026-08-31T01:52:06.387733+00:00

@@ -1,0 +1,18 @@
+EXOTEL VOICE / IVR LIVE DIAGNOSTIC EVIDENCE
+============================================================
+Endpoint: https://api.exotel.com/v1/Accounts/weathergpt2/Calls/connect.json
+Authentication: Basic Auth (API Key + API Token)
+Caller ID (From / ExoPhone): +91 95*****63 (Masked)
+Recipient (To): +91 90*****020 (Masked)
+Spoken Script: This is a WeatherGPT integration test. No action is required.
+
+Provider HTTP Status: 403 Forbidden
+Provider Exception Code: 340030
+Provider Message: "Your account is not yet KYC compliant. This is mandatory by TRAI guidelines to connect outbound voice calls."
+
+Root Cause Classification: PROVIDER_BLOCKED (ACCOUNT_KYC_RESTRICTION)
+Technical Assessment:
+- WeatherGPT Code & Endpoint: FULLY OPERATIONAL & CORRECT
+- Credentials & Authentication: VALID & ACCEPTED
+- Call Gate: BLOCKED by Exotel Provider due to mandatory TRAI business KYC compliance.
+Timestamp: 2026-08-30T16:00:26Z

@@ -1,0 +1,68 @@
+WEATHERGPT EXTERNAL INTEGRATION & PROVIDER STATUS
+============================================================
+Rule 5 & Rule 12 Compliance Audit
+
+1. Open-Meteo Weather API (https://api.open-meteo.com)
+   - Configuration: CONFIGURED
+   - Request Executed: YES (Live HTTP GET to Open-Meteo)
+   - Provider Response Observed: YES (HTTP 200 with temperature, humidity, wind, precipitation)
+   - End-to-End Result Observed: YES (Rendered in current weather & hourly/daily forecast cards)
+   - Classification: LIVE_REQUEST_ACCEPTED
+
+2. Open-Meteo Geocoding API (https://geocoding-api.open-meteo.com)
+   - Configuration: CONFIGURED
+   - Request Executed: YES (Live HTTP GET for Bengaluru, Delhi, Mumbai, Chennai, Kozhikode)
+   - Provider Response Observed: YES (Normalized coordinates, administrative areas returned)
+   - End-to-End Result Observed: YES (Autocompleted and selected in UI)
+   - Classification: LIVE_REQUEST_ACCEPTED
+
+3. NASA POWER Climatology API (https://power.larc.nasa.gov)
+   - Configuration: CONFIGURED
+   - Request Executed: YES (Live HTTP GET for climatology point)
+   - Provider Response Observed: YES (30-year monthly averages for temperature & solar irradiance)
+   - Caching Verified: YES (7-day TTL verified with subsequent ~8ms cache hit)
+   - End-to-End Result Observed: YES (Rendered in Agro-Climatology card)
+   - Classification: LIVE_REQUEST_ACCEPTED
+
+4. SACHET / NDMA CAP Feed (https://sachet.ndma.gov.in)
+   - Configuration: CONFIGURED
+   - Request Executed: YES (Live HTTP GET for RSS/CAP India feed)
+   - Provider Response Observed: YES (CAP XML successfully retrieved and normalized)
+   - Security Audit: PASS (No XXE, Safe ElementTree parsing, malformed feeds safely rejected)
+   - End-to-End Result Observed: YES (Disaster Alert Banner rendered with official source attribution)
+   - Classification: LIVE_REQUEST_ACCEPTED
+
+5. Google Gemini AI Engine
+   - Configuration: OPTIONAL / ENVIRONMENT-DEPENDENT
+   - Unit & Mock Tests Executed: YES (Tools, bounded loop, session TTL, prompt injection resistance)
+   - Fallback Behavior Observed: YES (Graceful HTTP 503 error message when unconfigured in .env)
+   - Classification: MOCK_TEST / UNIT_TEST
+
+6. Groq Whisper Audio STT
+   - Configuration: OPTIONAL / ENVIRONMENT-DEPENDENT
+   - Unit & Mock Tests Executed: YES (Mocked audio payload & error boundary tests passed)
+   - Fallback Behavior Observed: YES (Graceful HTTP 503 response when unconfigured)
+   - Classification: MOCK_TEST / UNIT_TEST
+
+7. Exotel SMS Provider
+   - Mode: NOTIFICATION_DRY_RUN=true
+   - Phone Validation Executed: YES (E.164 normalization, invalid numbers rejected)
+   - Live Dispatch: DISABLED
+   - Classification: SIMULATED (DRY_RUN)
+
+8. Exotel Voice IVR Provider
+   - Mode: NOTIFICATION_DRY_RUN=true
+   - SSML Script Generation Executed: YES (Multilingual templates verified)
+   - Live Dispatch: DISABLED
+   - Classification: SIMULATED (DRY_RUN)
+
+9. Web Push Provider (VAPID)
+   - Public Key Endpoint: HTTP 200
+   - Private Key Exposure: ZERO (Guarded strictly server-side)
+   - Live Dispatch: DISABLED
+   - Classification: SIMULATED (DRY_RUN)
+
+10. WhatsApp Cloud API
+   - Status: EXPLICITLY OUT OF SCOPE
+   - Modification: NONE
+   - Classification: NOT_TESTED (EXPLICITLY OUT OF SCOPE)

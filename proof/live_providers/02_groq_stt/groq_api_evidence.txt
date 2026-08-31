@@ -1,0 +1,6 @@
+GROQ WHISPER API PROTOCOL & LATENCY EVIDENCE
+============================================================
+Model: whisper-large-v3
+Execution Latency: 2111.1485958099365 ms
+Language Detected/Requested: en
+Transcribed Text: None

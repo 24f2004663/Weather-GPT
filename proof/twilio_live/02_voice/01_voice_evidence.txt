@@ -1,0 +1,11 @@
+TWILIO LIVE VOICE / IVR VERIFICATION EVIDENCE
+============================================================
+Endpoint: https://api.twilio.com/2010-04-01/Accounts/***/Calls.json
+Caller (From): +17 3725 ****34
+Recipient (To): +91 9042 ****20
+Spoken Script: This is an automated emergency notification test from WeatherGPT. All systems are operational.
+Adapter Status: NotificationStatus.SENT
+Twilio Call SID: CA97db4fc7bcd25403d226b8ca8a8830d2
+Twilio Call Status: ringing
+Error Detail: None
+Timestamp: 2026-08-31T01:52:05.076152+00:00

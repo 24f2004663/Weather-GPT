@@ -1,0 +1,41 @@
+SMS EMERGENCY NOTIFICATIONS PROOF (DRY RUN)
+============================================================
+Mode: NOTIFICATION_DRY_RUN=true, ENABLE_LIVE_NOTIFICATION_TESTS=false
+Zero live SMS dispatched to telecom providers.
+
+1. English Disaster SMS Formatting:
+{
+  "channel": "SMS",
+  "language": "en",
+  "recipient": "+91 9876 ****10",
+  "formatted_message": "[WeatherGPT Alert] Cyclone (EXTREME) for Coastal Tamil Nadu (Chennai, Tiruvallur). Action: Fishermen are advised not to venture into sea. Stay indoors in secure shelters. Source: SACHET/NDMA",
+  "provider": "Exotel",
+  "dry_run": true,
+  "metadata": {
+    "alert_id": "SAMPLE-ALERT-101",
+    "event_type": "Cyclone",
+    "severity": "Extreme",
+    "scope": "District"
+  }
+}
+
+2. Hindi Disaster SMS Formatting:
+{
+  "channel": "SMS",
+  "language": "hi",
+  "recipient": "+91 9876 ****10",
+  "formatted_message": "[WeatherGPT \u0906\u092a\u0926\u093e \u0905\u0932\u0930\u094d\u091f] Cyclone (Extreme) - Coastal Tamil Nadu (Chennai, Tiruvallur). \u0928\u093f\u0930\u094d\u0926\u0947\u0936: Fishermen are advised not to venture into sea. Stay indoors in secure shelters. \u0938\u094d\u0930\u094b\u0924: NDMA",
+  "provider": "Exotel",
+  "dry_run": true,
+  "metadata": {
+    "alert_id": "SAMPLE-ALERT-101",
+    "event_type": "Cyclone",
+    "severity": "Extreme",
+    "scope": "District"
+  }
+}
+
+3. Features Verified:
+- E.164 Phone number normalization & masking in all log files.
+- Max 160-character segmenting for critical alerts.
+- Severity threshold filtering (Minor / Moderate / Severe / Extreme).

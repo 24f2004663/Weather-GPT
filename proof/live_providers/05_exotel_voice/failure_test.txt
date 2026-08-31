@@ -1,0 +1,4 @@
+EXOTEL VOICE CONTROLLED FAILURE TEST
+============================================================
+Test: Voice dispatch without configured Caller ID
+Observed: Fails safely with clear non-sensitive log.

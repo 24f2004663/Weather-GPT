@@ -1,0 +1,14 @@
+ACCESSIBILITY REVIEW PROOF
+============================================================
+1. Semantic Hierarchy:
+- Single primary <h1> tag for WeatherGPT branding.
+- Structured <section> and <header> elements with aria-label annotations.
+
+2. Interactive Elements & Forms:
+- Accessible form controls with aria-label attributes (Location search input, Language selector dropdown).
+- High-contrast visual indicators for Live Feed and Cache hit states.
+- High-contrast alert badges (Extreme, Severe, Moderate).
+
+3. Keyboard Navigation:
+- Tab-accessible search, buttons, language selector, and modal controls.
+- Focus rings visible across interactive components.

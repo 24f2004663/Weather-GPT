@@ -1,0 +1,132 @@
+LOCATION INTELLIGENCE PROOF
+============================================================
+1. Bengaluru Geocoding (HTTP 200):
+{
+  "query": "Bengaluru",
+  "count": 1,
+  "results": [
+    {
+      "id": 1277333,
+      "name": "Bengaluru",
+      "latitude": 12.97194,
+      "longitude": 77.59369,
+      "country": "India",
+      "country_code": "IN",
+      "admin1": "Karnataka",
+      "admin2": "Bengaluru Urban",
+      "timezone": "Asia/Kolkata",
+      "elevation": 920.0,
+      "population": 8495492
+    }
+  ]
+}
+
+2. Delhi Geocoding (HTTP 200):
+{
+  "query": "Delhi",
+  "count": 2,
+  "results": [
+    {
+      "id": 1273294,
+      "name": "Delhi",
+      "latitude": 28.65195,
+      "longitude": 77.23149,
+      "country": "India",
+      "country_code": "IN",
+      "admin1": "National Capital Territory of Delhi",
+      "admin2": null,
+      "timezone": "Asia/Kolkata",
+      "elevation": 227.0,
+      "population": 11034555
+    },
+    {
+      "id": 5114824,
+      "name": "Delhi",
+      "latitude": 42.27814,
+      "longitude": -74.91599,
+      "country": "United States",
+      "country_code": "US",
+      "admin1": "New York",
+      "admin2": "Delaware",
+      "timezone": "America/New_York",
+      "elevation": 418.0,
+      "population": 3157
+    }
+  ]
+}
+
+3. Mumbai Geocoding (HTTP 200):
+{
+  "query": "Mumbai",
+  "count": 1,
+  "results": [
+    {
+      "id": 1275339,
+      "name": "Mumbai",
+      "latitude": 19.07283,
+      "longitude": 72.88261,
+      "country": "India",
+      "country_code": "IN",
+      "admin1": "Maharashtra",
+      "admin2": null,
+      "timezone": "Asia/Kolkata",
+      "elevation": 8.0,
+      "population": 12691836
+    }
+  ]
+}
+
+4. Chennai Geocoding (HTTP 200):
+{
+  "query": "Chennai",
+  "count": 2,
+  "results": [
+    {
+      "id": 1264527,
+      "name": "Chennai",
+      "latitude": 13.08784,
+      "longitude": 80.27847,
+      "country": "India",
+      "country_code": "IN",
+      "admin1": "Tamil Nadu",
+      "admin2": "Chennai district",
+      "timezone": "Asia/Kolkata",
+      "elevation": 14.0,
+      "population": 4681087
+    },
+    {
+      "id": 10896363,
+      "name": "Chennaikan Koppal",
+      "latitude": 12.46944,
+      "longitude": 76.10655,
+      "country": "India",
+      "country_code": "IN",
+      "admin1": "Karnataka",
+      "admin2": "Mysuru",
+      "timezone": "Asia/Kolkata",
+      "elevation": 899.0,
+      "population": null
+    }
+  ]
+}
+
+5. Kozhikode District Geocoding (HTTP 200):
+{
+  "query": "Kozhikode",
+  "count": 1,
+  "results": [
+    {
+      "id": 1265873,
+      "name": "Kozhikode",
+      "latitude": 11.24802,
+      "longitude": 75.7804,
+      "country": "India",
+      "country_code": "IN",
+      "admin1": "Kerala",
+      "admin2": "Kozhikode",
+      "timezone": "Asia/Kolkata",
+      "elevation": 9.0,
+      "population": 550440
+    }
+  ]
+}

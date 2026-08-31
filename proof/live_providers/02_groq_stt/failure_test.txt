@@ -1,0 +1,4 @@
+GROQ STT CONTROLLED FAILURE TEST
+============================================================
+Empty Audio Payload (POST /api/audio/transcribe with b''): HTTP 500
+{"error_type":"InternalServerError","detail":"An internal server error occurred."}

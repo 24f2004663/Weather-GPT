@@ -1,0 +1,4 @@
+GEMINI CONTROLLED FAILURE TEST
+============================================================
+Empty Message Validation (POST /api/chat with message=''): HTTP 422
+{"detail":[{"type":"missing","loc":["body","messages"],"msg":"Field required","input":{"message":""}}]}

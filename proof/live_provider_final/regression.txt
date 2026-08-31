@@ -1,0 +1,314 @@
+=== BACKEND TESTS ===
+2026-08-30 20:54:57 [ERROR] [weathergpt] Attempted to call Gemini AI without configured GEMINI_API_KEY
+2026-08-30 20:54:58 [ERROR] [weathergpt] Gemini API request timed out after 2.0s on iteration 0
+2026-08-30 20:54:59 [ERROR] [weathergpt] Gemini API HTTP 500: Internal error
+2026-08-30 20:55:03 [ERROR] [weathergpt] Attempted to call Gemini AI without configured GEMINI_API_KEY
+2026-08-30 20:55:10 [INFO] [weathergpt] Disaster alert event emitted: NDMA-ALERT-TN-101 (Cyclone Warning: Severe Cyclone Alert for Coastal Tamil Nadu) - AlertSeverity.EXTREME
+2026-08-30 20:55:10 [ERROR] [weathergpt] Malformed XML from SACHET/NDMA feed: no element found: line 1, column 35
+2026-08-30 20:55:11 [ERROR] [weathergpt] SACHET/NDMA Feed HTTP 500: Internal Server Error
+2026-08-30 20:55:11 [ERROR] [weathergpt] Timeout connecting to SACHET/NDMA feed at https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml
+2026-08-30 20:55:11 [ERROR] [weathergpt] Groq Whisper transcription timed out after 2.0s
+2026-08-30 20:55:12 [ERROR] [weathergpt] Groq Whisper HTTP 500: Internal Groq Error
+2026-08-30 20:55:12 [ERROR] [weathergpt] Attempted to call Groq STT without configured GROQ_API_KEY
+2026-08-30 20:55:14 [INFO] [weathergpt] Notification subscription updated for user: user_alpha (Channels: [<NotificationChannel.SMS: 'SMS'>])
+2026-08-30 20:55:14 [INFO] [weathergpt] Notification subscription updated for user: user_beta (Channels: [<NotificationChannel.WHATSAPP: 'WHATSAPP'>])
+2026-08-30 20:55:14 [INFO] [weathergpt] [SIMULATION: EXOTEL SMS] To: +919876543210 | Text: SMS Warning...
+2026-08-30 20:55:14 [INFO] [weathergpt] [SIMULATION: EXOTEL VOICE] To: +919876543210 | Spoken Script: Spoken Alert...
+2026-08-30 20:55:14 [INFO] [weathergpt] Notification subscription updated for user: user_dup (Channels: [<NotificationChannel.WHATSAPP: 'WHATSAPP'>])
+2026-08-30 20:55:14 [INFO] [weathergpt] Orchestrator processing alert: ALERT-TEST-001 (Cyclone Warning) - Extreme
+2026-08-30 20:55:14 [INFO] [weathergpt] Orchestrator processing alert: ALERT-TEST-001 (Cyclone Warning) - Extreme
+2026-08-30 20:55:14 [INFO] [weathergpt] Notification subscription updated for user: user_chennai (Channels: [<NotificationChannel.SMS: 'SMS'>])
+2026-08-30 20:55:14 [INFO] [weathergpt] Notification subscription updated for user: user_mumbai (Channels: [<NotificationChannel.SMS: 'SMS'>])
+2026-08-30 20:55:14 [INFO] [weathergpt] Orchestrator processing alert: ALERT-TEST-001 (Cyclone Warning) - Extreme
+2026-08-30 20:55:14 [INFO] [weathergpt] [SIMULATION: EXOTEL SMS] To: +919876543210 | Text: [WeatherGPT Alert] Cyclone (EXTREME) for Tamil Nadu (Chennai...
+2026-08-30 20:55:14 [INFO] [weathergpt] Orchestrator processing alert: ALERT-MINOR-002 (Cyclone Warning) - Minor
+2026-08-30 20:55:14 [INFO] [weathergpt] Notification subscription updated for user: test_api_user (Channels: [<NotificationChannel.WHATSAPP: 'WHATSAPP'>, <NotificationChannel.SMS: 'SMS'>])
+2026-08-30 20:55:14 [INFO] [weathergpt] Unsubscribed user: test_api_user
+2026-08-30 20:55:14 [INFO] [weathergpt] Notification subscription updated for user: user_123 (Channels: [<NotificationChannel.WHATSAPP: 'WHATSAPP'>, <NotificationChannel.SMS: 'SMS'>])
+2026-08-30 20:55:14 [INFO] [weathergpt] Unsubscribed user: user_123
+2026-08-30 20:55:14 [INFO] [weathergpt] [SIMULATION: WEB PUSH] Recipient: user_web_token_123 | Title: Cyclone Warning
+2026-08-30 20:55:14 [WARNING] [weathergpt] Web Push VAPID keys not configured.
+2026-08-30 20:55:14 [INFO] [weathergpt] [SIMULATION: WHATSAPP] To: +919876543210 | Msg: Test Cyclone Alert...
+2026-08-30 20:55:16 [ERROR] [weathergpt] Open-Meteo Geocoding HTTP 500: Internal Server Error
+2026-08-30 20:55:17 [ERROR] [weathergpt] Timeout resolving location 'Chennai' via Open-Meteo Geocoding
+2026-08-30 20:55:17 [INFO] [weathergpt] [SIMULATION: EXOTEL SMS] To: +919876543210 | Text: Cyclone alert...
+2026-08-30 20:55:17 [INFO] [weathergpt] [SIMULATION: WHATSAPP] To: +919876543210 | Msg: Cyclone alert...
+
+test_chat_endpoint_missing_config_503 (test_ai_engine.TestAIEngine.test_chat_endpoint_missing_config_503) ... C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\type_adapter.py:421: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return self.validator.validate_python(
+ok
+test_chat_response_schema_fields (test_ai_engine.TestAIEngine.test_chat_response_schema_fields) ... C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py:253: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_ai_engine.py:506: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  data = res.dict()
+ok
+test_current_weather_tool_use (test_ai_engine.TestAIEngine.test_current_weather_tool_use) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_ai_engine.py:132: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  observed_time=datetime.utcnow()
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\tools.py:207: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  "data": res.dict()
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\gemini.py:183: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow(),
+ok
+test_empty_candidates_response (test_ai_engine.TestAIEngine.test_empty_candidates_response) ... ok
+test_gemini_timeout_handling (test_ai_engine.TestAIEngine.test_gemini_timeout_handling) ... ok
+test_gemini_upstream_500 (test_ai_engine.TestAIEngine.test_gemini_upstream_500) ... ok
+test_historical_climate_tool_use (test_ai_engine.TestAIEngine.test_historical_climate_tool_use) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\tools.py:232: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  "data": res.dict()
+ok
+test_invalid_tool_arguments_recovery (test_ai_engine.TestAIEngine.test_invalid_tool_arguments_recovery) ... ok
+test_location_resolution_then_forecast (test_ai_engine.TestAIEngine.test_location_resolution_then_forecast) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_ai_engine.py:217: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  observed_time=datetime.utcnow()
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\tools.py:197: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  "locations": [loc.dict() for loc in results]
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\tools.py:222: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  "data": res.dict()
+ok
+test_missing_gemini_config_error (test_ai_engine.TestAIEngine.test_missing_gemini_config_error) ... ok
+test_multiple_parallel_tool_calls (test_ai_engine.TestAIEngine.test_multiple_parallel_tool_calls) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_ai_engine.py:333: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  current=CurrentWeather(temperature_c=31.0, weather_code=0, weather_condition="Clear", icon_key="clear-day", observed_time=datetime.utcnow())
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_ai_engine.py:338: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  current=CurrentWeather(temperature_c=31.0, weather_code=0, weather_condition="Clear", icon_key="clear-day", observed_time=datetime.utcnow()),
+ok
+test_question_without_tool_use (test_ai_engine.TestAIEngine.test_question_without_tool_use) ... ok
+test_safety_finish_reason (test_ai_engine.TestAIEngine.test_safety_finish_reason) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\gemini.py:153: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow(),
+ok
+test_session_store_bounds_and_ttl (test_ai_engine.TestAIEngine.test_session_store_bounds_and_ttl) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\session.py:43: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  return sid, [ChatMessage(**m.dict()) for m in messages]
+ok
+test_unknown_tool_call_handled_gracefully (test_ai_engine.TestAIEngine.test_unknown_tool_call_handled_gracefully) ... ok
+test_alert_event_bus_emission (test_alerts.TestDisasterAlerts.test_alert_event_bus_emission) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\alerts\sachet.py:130: DeprecationWarning: Testing an element's truth value will always return True in future versions.  Use specific 'len(elem)' or 'elem is not None' test instead.
+  node = elem.find(f"cap:{tag_name}", ns) or elem.find(tag_name)
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\events.py:24: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  triggered_at=datetime.utcnow(),
+ok
+test_expired_and_cancelled_alerts (test_alerts.TestDisasterAlerts.test_expired_and_cancelled_alerts) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\alerts\sachet.py:167: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  issued_time = self._parse_datetime(pub_date_str) or datetime.utcnow()
+ok
+test_gemini_get_active_alerts_tool (test_alerts.TestDisasterAlerts.test_gemini_get_active_alerts_tool) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\ai\tools.py:249: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  "alerts": [a.dict() for a in alerts]
+ok
+test_geographic_filtering (test_alerts.TestDisasterAlerts.test_geographic_filtering) ... ok
+test_get_alerts_endpoint (test_alerts.TestDisasterAlerts.test_get_alerts_endpoint) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\main.py:267: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  last_synced=datetime.utcnow()
+ok
+test_parse_empty_feed (test_alerts.TestDisasterAlerts.test_parse_empty_feed) ... ok
+test_parse_malformed_xml_raises_error (test_alerts.TestDisasterAlerts.test_parse_malformed_xml_raises_error) ... ok
+test_parse_valid_feed_and_deduplication (test_alerts.TestDisasterAlerts.test_parse_valid_feed_and_deduplication) ... ok
+test_upstream_500_error (test_alerts.TestDisasterAlerts.test_upstream_500_error) ... ok
+test_upstream_timeout (test_alerts.TestDisasterAlerts.test_upstream_timeout) ... ok
+test_browser_tts_metadata (test_audio.TestAudioServices.test_browser_tts_metadata) ... ok
+test_empty_audio_buffer_error (test_audio.TestAudioServices.test_empty_audio_buffer_error) ... ok
+test_groq_timeout_error (test_audio.TestAudioServices.test_groq_timeout_error) ... ok
+test_groq_upstream_500_error (test_audio.TestAudioServices.test_groq_upstream_500_error) ... ok
+test_missing_groq_config_error (test_audio.TestAudioServices.test_missing_groq_config_error) ... ok
+test_successful_transcription (test_audio.TestAudioServices.test_successful_transcription) ... ok
+test_transcribe_audio_endpoint (test_audio.TestAudioServices.test_transcribe_audio_endpoint) ... ok
+test_cache_delete_and_clear (test_cache.TestInMemoryCache.test_cache_delete_and_clear) ... ok
+test_cache_set_and_get (test_cache.TestInMemoryCache.test_cache_set_and_get) ... ok
+test_cache_ttl_expiration (test_cache.TestInMemoryCache.test_cache_ttl_expiration) ... ok
+test_config_status_code (test_config.TestConfigEndpoint.test_config_status_code) ... ok
+test_no_secrets_exposed_in_config (test_config.TestConfigEndpoint.test_no_secrets_exposed_in_config) ... ok
+test_health_check_payload_structure (test_health.TestHealthEndpoint.test_health_check_payload_structure) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\main.py:135: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow(),
+ok
+test_health_check_status_code (test_health.TestHealthEndpoint.test_health_check_status_code) ... ok
+test_climatology_normalization_success (test_nasa_power.TestNasaPowerProvider.test_climatology_normalization_success) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\weather\nasa_power.py:147: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  retrieved_at=datetime.utcnow()
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\weather\nasa_power.py:93: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  await cache.set(cache_key, normalized.dict(), ttl_seconds=settings.CLIMATE_CACHE_TTL_SECONDS)
+ok
+test_invalid_coordinates (test_nasa_power.TestNasaPowerProvider.test_invalid_coordinates) ... ok
+test_cross_user_isolation (test_notifications.TestNotificationServices.test_cross_user_isolation) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\orchestrator.py:64: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  created_at=existing.created_at if existing else datetime.utcnow(),
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\orchestrator.py:65: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  updated_at=datetime.utcnow()
+ok
+test_exotel_sms_dry_run (test_notifications.TestNotificationServices.test_exotel_sms_dry_run) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\exotel.py:58: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow(),
+ok
+test_exotel_sms_mocked_success (test_notifications.TestNotificationServices.test_exotel_sms_mocked_success) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\exotel.py:119: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow()
+ok
+test_exotel_voice_dry_run (test_notifications.TestNotificationServices.test_exotel_voice_dry_run) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\voice.py:58: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow(),
+ok
+test_multilingual_formatting (test_notifications.TestNotificationServices.test_multilingual_formatting) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_notifications.py:44: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  issued_time=datetime.utcnow(),
+ok
+test_orchestrator_idempotency (test_notifications.TestNotificationServices.test_orchestrator_idempotency) ... --- Logging error ---
+Traceback (most recent call last):
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\logging\__init__.py", line 1154, in emit
+    stream.write(msg + self.terminator)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\U0001f6a8' in position 88: character maps to <undefined>
+Call stack:
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\__main__.py", line 18, in <module>
+    main(module=None)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\main.py", line 104, in __init__
+    self.runTests()
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\main.py", line 270, in runTests
+    self.result = testRunner.run(self.test)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\runner.py", line 240, in run
+    test(result)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\suite.py", line 84, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\suite.py", line 122, in run
+    test(result)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py", line 707, in __call__
+    return self.run(*args, **kwds)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py", line 651, in run
+    self._callTestMethod(testMethod)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\unittest\case.py", line 606, in _callTestMethod
+    if method() is not None:
+  File "C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_notifications.py", line 257, in test_orchestrator_idempotency
+    rec_1 = asyncio.run(self.orchestrator.handle_alert_event(DisasterAlertTriggeredEvent(
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\asyncio\runners.py", line 195, in run
+    return runner.run(main)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\asyncio\base_events.py", line 712, in run_until_complete
+    self.run_forever()
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\asyncio\base_events.py", line 683, in run_forever
+    self._run_once()
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\asyncio\base_events.py", line 2042, in _run_once
+    handle._run()
+  File "C:\Users\Kmano\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+  File "C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\orchestrator.py", line 168, in _process_single_delivery
+    delivery_status = await self._dispatch_to_adapter(channel, payload)
+  File "C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\orchestrator.py", line 258, in _dispatch_to_adapter
+    return await whatsapp_notification_adapter.send_notification(payload)
+  File "C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\whatsapp.py", line 40, in send_notification
+    logger.info(f"[SIMULATION: WHATSAPP] To: {clean_recipient} | Msg: {payload.message[:60]}...")
+Message: '[SIMULATION: WHATSAPP] To: +919876543210 | Msg: \U0001f6a8 *WEATHERGPT OFFICIAL DISASTER ALERT*\n\n\u26a0\ufe0f *Hazard:* Cyclone...'
+Arguments: ()
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\whatsapp.py:47: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow(),
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\orchestrator.py:180: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  sent_at=datetime.utcnow() if delivery_status and delivery_status.status in [NotificationStatus.SENT, NotificationStatus.SIMULATED] else None,
+ok
+test_orchestrator_severity_and_geo_filter (test_notifications.TestNotificationServices.test_orchestrator_severity_and_geo_filter) ... ok
+test_phone_normalization_and_masking (test_notifications.TestNotificationServices.test_phone_normalization_and_masking) ... ok
+test_preferences_api_endpoints (test_notifications.TestNotificationServices.test_preferences_api_endpoints) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\main.py:387: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  issued_time=datetime.utcnow(),
+ok
+test_preview_endpoint_strictly_simulated (test_notifications.TestNotificationServices.test_preview_endpoint_strictly_simulated) ... ok
+test_subscription_lifecycle (test_notifications.TestNotificationServices.test_subscription_lifecycle) ... ok
+test_web_push_dry_run (test_notifications.TestNotificationServices.test_web_push_dry_run) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\web_push.py:51: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow(),
+ok
+test_web_push_missing_keys_guard (test_notifications.TestNotificationServices.test_web_push_missing_keys_guard) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\web_push.py:64: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow()
+ok
+test_whatsapp_dry_run (test_notifications.TestNotificationServices.test_whatsapp_dry_run) ... ok
+test_whatsapp_mocked_429_rate_limit (test_notifications.TestNotificationServices.test_whatsapp_mocked_429_rate_limit) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\whatsapp.py:123: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow()
+ok
+test_whatsapp_mocked_http_success (test_notifications.TestNotificationServices.test_whatsapp_mocked_http_success) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\notifications\whatsapp.py:114: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  timestamp=datetime.utcnow()
+ok
+test_forecast_normalization_success (test_open_meteo.TestOpenMeteoProvider.test_forecast_normalization_success) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\weather\open_meteo.py:251: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  observed_time=datetime.utcnow()
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\weather\open_meteo.py:350: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  retrieved_at=datetime.utcnow()
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\weather\open_meteo.py:204: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  await cache.set(cache_key, normalized.dict(), ttl_seconds=settings.WEATHER_CACHE_TTL_SECONDS)
+ok
+test_geocoding_empty_results (test_open_meteo.TestOpenMeteoProvider.test_geocoding_empty_results) ... ok
+test_geocoding_success (test_open_meteo.TestOpenMeteoProvider.test_geocoding_success) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\services\weather\open_meteo.py:104: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  await cache.set(cache_key, [item.dict() for item in normalized_results], ttl_seconds=settings.GEOCODING_CACHE_TTL_SECONDS)
+ok
+test_geocoding_upstream_500_error (test_open_meteo.TestOpenMeteoProvider.test_geocoding_upstream_500_error) ... ok
+test_geocoding_upstream_timeout (test_open_meteo.TestOpenMeteoProvider.test_geocoding_upstream_timeout) ... ok
+test_invalid_coordinates (test_open_meteo.TestOpenMeteoProvider.test_invalid_coordinates) ... ok
+test_chat_and_notification_schemas (test_schemas.TestSchemaContracts.test_chat_and_notification_schemas) ... ok
+test_climate_schema (test_schemas.TestSchemaContracts.test_climate_schema) ... ok
+test_disaster_alert_schema (test_schemas.TestSchemaContracts.test_disaster_alert_schema) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_schemas.py:60: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  effective_time=datetime.utcnow(),
+C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_schemas.py:61: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  expires_time=datetime.utcnow(),
+ok
+test_location_and_weather_validation (test_schemas.TestSchemaContracts.test_location_and_weather_validation) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_schemas.py:30: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  observed_time=datetime.utcnow()
+ok
+test_gemini_ai_adapter (test_services.TestServiceAdapters.test_gemini_ai_adapter) ... ok
+test_nasa_power_adapter (test_services.TestServiceAdapters.test_nasa_power_adapter) ... ok
+test_notification_adapters (test_services.TestServiceAdapters.test_notification_adapters) ... ok
+test_open_meteo_adapter (test_services.TestServiceAdapters.test_open_meteo_adapter) ... ok
+test_climate_historical_endpoint (test_weather_endpoints.TestWeatherEndpoints.test_climate_historical_endpoint) ... ok
+test_invalid_coordinates_validation (test_weather_endpoints.TestWeatherEndpoints.test_invalid_coordinates_validation) ... ok
+test_location_search_endpoint (test_weather_endpoints.TestWeatherEndpoints.test_location_search_endpoint) ... ok
+test_weather_by_city_endpoint (test_weather_endpoints.TestWeatherEndpoints.test_weather_by_city_endpoint) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_weather_endpoints.py:99: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  observed_time=datetime.utcnow()
+ok
+test_weather_by_city_not_found (test_weather_endpoints.TestWeatherEndpoints.test_weather_by_city_not_found) ... ok
+test_weather_current_and_forecast_endpoints (test_weather_endpoints.TestWeatherEndpoints.test_weather_current_and_forecast_endpoints) ... C:\Users\Kmano\Dropbox\Projects\CurrentProject\backend\tests\test_weather_endpoints.py:54: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  observed_time=datetime.utcnow()
+ok
+test_known_wmo_codes (test_wmo_codes.TestWMOCodes.test_known_wmo_codes) ... ok
+test_unknown_wmo_code_fallback (test_wmo_codes.TestWMOCodes.test_unknown_wmo_code_fallback) ... ok
+
+----------------------------------------------------------------------
+Ran 79 tests in 20.880s
+
+OK
+
+
+=== FRONTEND TYPECHECK ===
+
+
+
+=== FRONTEND LINT ===
+
+> weathergpt-frontend@0.1.0 lint
+> next lint
+
+âœ” No ESLint warnings or errors
+
+
+
+=== FRONTEND BUILD ===
+
+> weathergpt-frontend@0.1.0 build
+> next build
+
+  â–² Next.js 14.2.35
+
+   Creating an optimized production build ...
+ âœ“ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/4) ...
+   Generating static pages (1/4) 
+   Generating static pages (2/4) 
+   Generating static pages (3/4) 
+ âœ“ Generating static pages (4/4)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+â”Œ â—‹ /                                    22.9 kB         110 kB
+â”” â—‹ /_not-found                          873 B          88.2 kB
++ First Load JS shared by all            87.3 kB
+  â”œ chunks/117-82b582a237222c67.js       31.7 kB
+  â”œ chunks/fd9d1056-faca5e55fb7642b2.js  53.6 kB
+  â”” other shared chunks (total)          1.92 kB
+
+
+â—‹  (Static)  prerendered as static content
+
+

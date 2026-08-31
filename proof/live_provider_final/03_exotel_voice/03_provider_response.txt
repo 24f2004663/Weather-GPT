@@ -1,0 +1,7 @@
+EXOTEL VOICE PROVIDER RESPONSE METADATA
+============================================================
+Delivery Status: NotificationStatus.FAILED
+Call Reference ID: None
+Simulated Flag: False
+Error Detail: Exotel Voice API returned HTTP 403: {"RestException":{"Status":403,"Message":"Your account is not yet KYC compliant. This is mandatory b
+Timestamp: 2026-08-30T15:23:29.685070Z

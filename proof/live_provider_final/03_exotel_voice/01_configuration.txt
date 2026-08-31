@@ -1,0 +1,7 @@
+EXOTEL VOICE / IVR CONFIGURATION STATE
+============================================================
+Account SID Configured: True
+API Key Configured: True
+API Token Configured: True
+Caller ID Configured: True
+Controlled Recipient: +91 9042 ****20

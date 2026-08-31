@@ -1,0 +1,7 @@
+EXOTEL SMS PHYSICAL DELIVERY CONFIRMATION
+============================================================
+Target Recipient: +91 90*****020 (Masked PII)
+Provider Request Status: HTTP 200 OK (Accepted with SID d33b229c802c1dbd75b359d898fd1a8u)
+Manual Handset Confirmation: NOT RECEIVED (Confirmed by user on 2026-08-30)
+Downstream Delivery Status: DELIVERY_NOT_CONFIRMED (Carrier dropped or blocked downstream, likely due to TRAI DLT template registration requirements or DND registry on trial account)
+Final Classification: LIVE_PROVIDER_REQUEST_ACCEPTED (NOT DELIVERY_CONFIRMED)

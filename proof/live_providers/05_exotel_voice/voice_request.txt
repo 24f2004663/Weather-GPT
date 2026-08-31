@@ -1,0 +1,6 @@
+EXOTEL VOICE / IVR REQUEST METADATA (CONTROLLED TEST)
+============================================================
+Recipient: +91 98*****210 (Masked PII)
+Spoken Script: 'This is a WeatherGPT integration test. No action is required.'
+Account SID Present: False
+Caller ID Present: False

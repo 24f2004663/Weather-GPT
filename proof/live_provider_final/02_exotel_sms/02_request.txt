@@ -1,0 +1,7 @@
+EXOTEL SMS LIVE REQUEST METADATA
+============================================================
+Endpoint: https://api.exotel.com.exotel.com/v1/Accounts/weathergpt2/Sms/send.json
+Recipient: +91 9042 ****20
+Sender (From): 09513886363
+Message: WeatherGPT integration test — no action required.
+Timestamp: 2026-08-30T15:23:28.431374Z

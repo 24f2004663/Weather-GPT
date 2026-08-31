@@ -1,0 +1,12 @@
+VOICE OUTPUT (TEXT-TO-SPEECH) PROOF
+============================================================
+Implementation: Browser Native SpeechSynthesis API (window.speechSynthesis)
+Features Verified:
+- Play / Pause / Resume / Stop playback controls on AI messages.
+- Automatic language voice mapping:
+  - English -> en-IN / en-US
+  - Hindi -> hi-IN
+  - Tamil -> ta-IN
+  - Telugu -> te-IN
+  - Bengali -> bn-IN
+- Fallback voice selection when specific regional voice pack is unavailable in OS.

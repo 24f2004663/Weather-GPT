@@ -1,0 +1,44 @@
+ERROR RECOVERY & RESILIENCE PROOF
+============================================================
+1. Location Not Found (404 Error Handling):
+HTTP Status: 404
+Response:
+{
+  "error_type": "LocationNotFound",
+  "detail": "Could not resolve city location 'NonExistentPlace999'"
+}
+
+2. Invalid Coordinate Bounds (422 Error Handling):
+HTTP Status: 422
+Response:
+{
+  "detail": [
+    {
+      "type": "less_than_equal",
+      "loc": [
+        "query",
+        "lat"
+      ],
+      "msg": "Input should be less than or equal to 90",
+      "input": "120.0",
+      "ctx": {
+        "le": 90.0
+      }
+    },
+    {
+      "type": "less_than_equal",
+      "loc": [
+        "query",
+        "lon"
+      ],
+      "msg": "Input should be less than or equal to 180",
+      "input": "500.0",
+      "ctx": {
+        "le": 180.0
+      }
+    }
+  ]
+}
+
+3. Resiliency Invariant:
+Backend remains fully operational during upstream outages, returning structured error objects with retry hints.

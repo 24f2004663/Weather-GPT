@@ -1,0 +1,8 @@
+EXOTEL SMS CONFIGURATION STATE
+============================================================
+Account SID Configured: True
+API Key Configured: True
+API Token Configured: True
+Sub Domain: api.exotel.com
+Caller ID Configured: True
+Controlled Recipient: +91 9042 ****20

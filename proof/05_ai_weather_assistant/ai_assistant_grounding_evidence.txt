@@ -1,0 +1,18 @@
+AI WEATHER ASSISTANT CAPABILITY AUDIT & EVIDENCE
+============================================================
+1. Tool Definition Matrix:
+- resolve_location(query: str, count: int)
+- get_current_weather(lat: float, lon: float)
+- get_weather_forecast(lat: float, lon: float, days: int)
+- get_historical_climate(lat: float, lon: float)
+- get_active_alerts(lat: float, lon: float, state: str, district: str)
+
+2. Bounded Tool Loop & Safety Bounds:
+- MAX_ITERATIONS = 5 enforced
+- Tool execution sandboxed via Pydantic input schemas
+- Prompt injection & arbitrary command execution strictly rejected
+- Session Store bounded to max 20 messages with 1-hour TTL
+
+3. Configuration & Graceful Fallback:
+- When GEMINI_API_KEY is unset, API returns structured HTTP 503 with GeminiConfigMissingError.
+- When configured, Gemini calls server-side tools and returns grounded weather answers with source attribution.

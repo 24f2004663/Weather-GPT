@@ -1,0 +1,8 @@
+SECURITY & PRIVACY AUDIT PROOF
+============================================================
+1. Secret Audit: 82 files scanned, 0 hardcoded secrets or live private keys.
+2. VAPID Guard: Public key exposed via /api/notifications/vapid-public-key; private key remains strictly backend-only.
+3. PII Sanitization: Phone numbers masked in all application log lines (e.g. +91*****43210).
+4. XML Security: SACHET XML parser hardened against XXE and expansion payloads.
+5. AI Sandboxing: Server-side tool execution allowlist only; prompt injections and file system access strictly blocked.
+6. CORS Protection: Allowed origins restricted to localhost:3000 / 127.0.0.1:3000.

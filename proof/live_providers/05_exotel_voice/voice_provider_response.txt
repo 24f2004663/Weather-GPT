@@ -1,0 +1,4 @@
+EXOTEL VOICE PROVIDER RESPONSE
+============================================================
+Provider Call Result: BLOCKED / NOT_CONFIGURED (EXOTEL_ACCOUNT_SID / EXOTEL_CALLER_ID empty)
+Dry-Run Simulation: VERIFIED (SSML script generated cleanly with rate controls)

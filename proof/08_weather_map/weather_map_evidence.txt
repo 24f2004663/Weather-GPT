@@ -1,0 +1,7 @@
+WEATHER MAP GEOSPATIAL INTELLIGENCE PROOF
+============================================================
+- Tile Layer: OpenStreetMap Standard Cartographic Tiles (https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png)
+- Geospatial Marker: Synchronized with selected location coordinates.
+- Temperature Badge: Overlaid on map marker in real-time.
+- Alert Boundary Overlays: Rendered at state/district level without false street-level precision.
+- Coordinate Inversion Guard: Strict lat/lon boundary validation (-90 <= lat <= 90, -180 <= lon <= 180).

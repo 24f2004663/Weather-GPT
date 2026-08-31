@@ -1,0 +1,12 @@
+TWILIO LIVE SMS VERIFICATION EVIDENCE
+============================================================
+Endpoint: https://api.twilio.com/2010-04-01/Accounts/***/Messages.json
+Sender (From): +17 3725 ****34
+Recipient (To): +91 9042 ****20
+Message: WeatherGPT Twilio integration test — Emergency SMS dispatch verified. No action required.
+Adapter Status: NotificationStatus.FAILED
+Twilio Message SID: None
+Twilio Message Status: unknown
+Twilio Error Code: None
+Error Detail: Twilio SMS API error 572006: Invalid template name. Trial accounts can only use predefined SMS templates.
+Timestamp: 2026-08-31T01:51:59.839375+00:00

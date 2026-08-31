@@ -1,0 +1,22 @@
+PERSONALIZED WEATHER ADVICE LOGICAL REASONING PROOF
+============================================================
+The system derives actionable decision advice strictly from Open-Meteo numerical predictions:
+
+1. Umbrella & Rain Advisory Rule:
+   - Condition: precipitation_probability_max >= 35% OR precipitation_sum_mm >= 1.0mm OR current precipitation > 0.1mm
+   - Result when True: 'Carry an Umbrella Today' with calculated rain probability.
+   - Result when False: 'No Umbrella Needed (Dry conditions expected)'.
+
+2. Thermal Comfort / Extreme Heat Caution Rule:
+   - Condition: apparent_temperature >= 38°C -> 'Extreme Heat Caution'
+   - Condition: apparent_temperature <= 15°C -> 'Cool Weather Advisory'
+   - Condition: 16°C to 37°C -> 'Pleasant Thermal Comfort'
+
+3. UV Sun Exposure Rule:
+   - Condition: max_uv >= 6.0 -> 'High UV Index Warning (Sunscreen & sunglasses advised)'
+   - Condition: max_uv < 6.0 -> 'Moderate/Low UV Index'
+
+4. Best Outdoor Activity Window:
+   - Evaluates next 12 hourly forecast slots.
+   - Minimizes precipitation probability while targeting optimal comfort zone (20-28°C).
+   - Dynamically selects best 2-3 hour time slot.

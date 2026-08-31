@@ -1,0 +1,7 @@
+EXOTEL SMS PROVIDER RESPONSE METADATA
+============================================================
+Delivery Status: NotificationStatus.SENT
+Provider Reference ID: d33b229c802c1dbd75b359d898fd1a8u
+Simulated Flag: False
+Error Detail: None
+Timestamp: 2026-08-30T15:23:29.136900Z

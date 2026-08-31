@@ -1,0 +1,13 @@
+VOICE INPUT (SPEECH-TO-TEXT) AUDIT & FALLBACK EVIDENCE
+============================================================
+Backend Endpoint: POST /api/audio/transcribe
+Model: Groq Whisper (whisper-large-v3)
+
+1. Unconfigured Environment Fallback:
+- When GROQ_API_KEY is not provided, the endpoint returns HTTP 503 Service Unavailable:
+  {"error_type": "GroqConfigMissing", "detail": "Groq API Key is not configured..."}
+- Tested and verified with dummy audio payload.
+
+2. Browser Microphone Integration:
+- Uses MediaRecorder API with WebM/WAV audio blob streaming.
+- Safe permissions prompt, recording timer, stop, and transcript edit before submission.

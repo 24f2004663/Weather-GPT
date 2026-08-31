@@ -1,0 +1,125 @@
+CURRENT WEATHER OBSERVATION PROOF
+============================================================
+1. Bengaluru Live Weather (HTTP 200):
+{
+  "provider": "Open-Meteo",
+  "location": {
+    "id": null,
+    "name": "Location (12.97, 77.59)",
+    "latitude": 12.9716,
+    "longitude": 77.5946,
+    "country": null,
+    "country_code": null,
+    "admin1": null,
+    "admin2": null,
+    "timezone": "Asia/Kolkata",
+    "elevation": 910.0,
+    "population": null
+  },
+  "current": {
+    "temperature_c": 23.0,
+    "apparent_temperature_c": 23.0,
+    "humidity_percent": null,
+    "precipitation_mm": null,
+    "wind_speed_kmh": 15.1,
+    "wind_direction_deg": 278,
+    "wind_gusts_kmh": null,
+    "weather_code": 3,
+    "weather_condition": "Overcast",
+    "icon_key": "overcast",
+    "is_day": 0,
+    "uv_index": null,
+    "cloud_cover_percent": null,
+    "pressure_hpa": null,
+    "air_quality_index": null,
+    "observed_time": "2026-08-30T13:17:00.222396"
+  },
+  "hourly": [],
+  "daily": [
+    {
+      "date": "2026-08-30",
+      "temperature_max_c": 28.8,
+      "temperature_min_c": 19.5,
+      "apparent_temperature_max_c": 29.7,
+      "apparent_temperature_min_c": 20.7,
+      "precipitation_sum_mm": 3.0,
+      "precipitation_probability_max": 76,
+      "precipitation_hours": 9.0,
+      "weather_code": 53,
+      "weather_condition": "Moderate Drizzle",
+      "icon_key": "drizzle",
+      "wind_speed_max_kmh": 19.8,
+      "wind_gusts_max_kmh": 49.7,
+      "wind_direction_dominant_deg": 271,
+      "sunrise": "2026-08-30T06:08",
+      "sunset": "2026-08-30T18:32",
+      "uv_index_max": 9.4
+    }
+  ],
+  "timezone": "Asia/Kolkata",
+  "elevation_m": 910.0,
+  "cached": false,
+  "retrieved_at": "2026-08-30T13:17:00.222516"
+}
+
+2. Chennai Live Weather (HTTP 200):
+{
+  "provider": "Open-Meteo",
+  "location": {
+    "id": null,
+    "name": "Location (13.08, 80.27)",
+    "latitude": 13.0827,
+    "longitude": 80.2707,
+    "country": null,
+    "country_code": null,
+    "admin1": null,
+    "admin2": null,
+    "timezone": "Asia/Kolkata",
+    "elevation": 12.0,
+    "population": null
+  },
+  "current": {
+    "temperature_c": 32.2,
+    "apparent_temperature_c": 32.2,
+    "humidity_percent": null,
+    "precipitation_mm": null,
+    "wind_speed_kmh": 6.0,
+    "wind_direction_deg": 155,
+    "wind_gusts_kmh": null,
+    "weather_code": 3,
+    "weather_condition": "Overcast",
+    "icon_key": "overcast",
+    "is_day": 0,
+    "uv_index": null,
+    "cloud_cover_percent": null,
+    "pressure_hpa": null,
+    "air_quality_index": null,
+    "observed_time": "2026-08-30T13:17:02.094206"
+  },
+  "hourly": [],
+  "daily": [
+    {
+      "date": "2026-08-30",
+      "temperature_max_c": 36.3,
+      "temperature_min_c": 28.1,
+      "apparent_temperature_max_c": 39.3,
+      "apparent_temperature_min_c": 30.2,
+      "precipitation_sum_mm": 0.5,
+      "precipitation_probability_max": 89,
+      "precipitation_hours": 3.0,
+      "weather_code": 51,
+      "weather_condition": "Light Drizzle",
+      "icon_key": "drizzle",
+      "wind_speed_max_kmh": 15.9,
+      "wind_gusts_max_kmh": 41.4,
+      "wind_direction_dominant_deg": 263,
+      "sunrise": "2026-08-30T05:57",
+      "sunset": "2026-08-30T18:21",
+      "uv_index_max": 9.15
+    }
+  ],
+  "timezone": "Asia/Kolkata",
+  "elevation_m": 12.0,
+  "cached": false,
+  "retrieved_at": "2026-08-30T13:17:02.094308"
+}

@@ -1,0 +1,137 @@
+NASA POWER CLIMATOLOGY INTELLIGENCE PROOF
+============================================================
+Endpoint: GET /api/climate/historical?lat=12.9716&lon=77.5946
+HTTP Status: 200
+Cached Response Time: 4.31 ms (7-Day TTL Cache Hit)
+
+30-Year Monthly Climatological Averages:
+{
+  "provider": "NASA POWER",
+  "location": {
+    "id": null,
+    "name": "Location (12.97, 77.59)",
+    "latitude": 12.9716,
+    "longitude": 77.5946,
+    "country": null,
+    "country_code": null,
+    "admin1": null,
+    "admin2": null,
+    "timezone": null,
+    "elevation": null,
+    "population": null
+  },
+  "annual_averages": {
+    "T2M": 23.74,
+    "PRECTOTCORR": 2.31,
+    "ALLSKY_SFC_SW_DWN": 19.73,
+    "RH2M": 67.94,
+    "WS10M": 4.11
+  },
+  "monthly_data": [
+    {
+      "month": "JAN",
+      "temperature_2m_c": 21.1,
+      "precipitation_mm_day": 0.08,
+      "solar_radiation_kwh_m2_day": 19.78,
+      "relative_humidity_percent": 63.14,
+      "wind_speed_10m_ms": 3.51
+    },
+    {
+      "month": "FEB",
+      "temperature_2m_c": 23.52,
+      "precipitation_mm_day": 0.16,
+      "solar_radiation_kwh_m2_day": 22.61,
+      "relative_humidity_percent": 50.77,
+      "wind_speed_10m_ms": 3.68
+    },
+    {
+      "month": "MAR",
+      "temperature_2m_c": 26.75,
+      "precipitation_mm_day": 0.54,
+      "solar_radiation_kwh_m2_day": 23.79,
+      "relative_humidity_percent": 43.53,
+      "wind_speed_10m_ms": 3.65
+    },
+    {
+      "month": "APR",
+      "temperature_2m_c": 28.37,
+      "precipitation_mm_day": 1.91,
+      "solar_radiation_kwh_m2_day": 23.75,
+      "relative_humidity_percent": 48.73,
+      "wind_speed_10m_ms": 3.18
+    },
+    {
+      "month": "MAY",
+      "temperature_2m_c": 26.97,
+      "precipitation_mm_day": 3.54,
+      "solar_radiation_kwh_m2_day": 22.4,
+      "relative_humidity_percent": 63.83,
+      "wind_speed_10m_ms": 3.65
+    },
+    {
+      "month": "JUN",
+      "temperature_2m_c": 24.28,
+      "precipitation_mm_day": 2.54,
+      "solar_radiation_kwh_m2_day": 19.18,
+      "relative_humidity_percent": 74.67,
+      "wind_speed_10m_ms": 5.68
+    },
+    {
+      "month": "JUL",
+      "temperature_2m_c": 23.54,
+      "precipitation_mm_day": 3.22,
+      "solar_radiation_kwh_m2_day": 17.13,
+      "relative_humidity_percent": 76.76,
+      "wind_speed_10m_ms": 6.13
+    },
+    {
+      "month": "AUG",
+      "temperature_2m_c": 23.31,
+      "precipitation_mm_day": 3.63,
+      "solar_radiation_kwh_m2_day": 17.35,
+      "relative_humidity_percent": 78.69,
+      "wind_speed_10m_ms": 5.52
+    },
+    {
+      "month": "SEP",
+      "temperature_2m_c": 23.15,
+      "precipitation_mm_day": 5.05,
+      "solar_radiation_kwh_m2_day": 19.05,
+      "relative_humidity_percent": 80.18,
+      "wind_speed_10m_ms": 4.01
+    },
+    {
+      "month": "OCT",
+      "temperature_2m_c": 22.54,
+      "precipitation_mm_day": 4.54,
+      "solar_radiation_kwh_m2_day": 18.09,
+      "relative_humidity_percent": 81.01,
+      "wind_speed_10m_ms": 3.04
+    },
+    {
+      "month": "NOV",
+      "temperature_2m_c": 21.14,
+      "precipitation_mm_day": 1.87,
+      "solar_radiation_kwh_m2_day": 16.79,
+      "relative_humidity_percent": 79.15,
+      "wind_speed_10m_ms": 3.47
+    },
+    {
+      "month": "DEC",
+      "temperature_2m_c": 20.22,
+      "precipitation_mm_day": 0.48,
+      "solar_radiation_kwh_m2_day": 17.11,
+      "relative_humidity_percent": 73.63,
+      "wind_speed_10m_ms": 3.7
+    }
+  ],
+  "parameters_explained": {
+    "T2M": "Temperature at 2 Meters (\u00b0C)",
+    "PRECTOTCORR": "Precipitation Corrected (mm/day)",
+    "ALLSKY_SFC_SW_DWN": "All Sky Surface Solar Irradiance (kW-hr/m\u00b2/day)",
+    "RH2M": "Relative Humidity at 2 Meters (%)",
+    "WS10M": "Wind Speed at 10 Meters (m/s)"
+  },
+  "cached": false,
+  "retrieved_at": "2026-08-30T13:17:05.900455"
+}

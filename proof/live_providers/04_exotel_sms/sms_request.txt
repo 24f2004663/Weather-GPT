@@ -1,0 +1,7 @@
+EXOTEL SMS REQUEST METADATA (CONTROLLED TEST)
+============================================================
+Recipient: +91 98*****210 (Masked PII)
+Message Text: 'WeatherGPT integration test — no action required.'
+Account SID Present: False
+API Key Present: True
+API Token Present: True

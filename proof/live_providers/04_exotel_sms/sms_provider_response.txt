@@ -1,0 +1,4 @@
+EXOTEL SMS PROVIDER RESPONSE
+============================================================
+Provider Call Result: BLOCKED / NOT_CONFIGURED (EXOTEL_ACCOUNT_SID is empty in environment)
+Dry-Run Simulation: VERIFIED (Passes through simulated dry-run bus)

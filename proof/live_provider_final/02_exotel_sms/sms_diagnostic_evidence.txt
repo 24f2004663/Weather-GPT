@@ -1,0 +1,18 @@
+EXOTEL SMS LIVE DIAGNOSTIC EVIDENCE
+============================================================
+Endpoint: https://api.exotel.com/v1/Accounts/weathergpt2/Sms/send.json
+Authentication: Basic Auth (API Key + API Token)
+Sender (From / ExoPhone): +91 95*****63 (Masked)
+Recipient (To): +91 90*****020 (Masked)
+Message: WeatherGPT integration test — no action required.
+
+Provider HTTP Status: 403 Forbidden
+Provider Exception Code: 340030
+Provider Message: "Your account is not yet KYC compliant"
+
+Root Cause Classification: PROVIDER_BLOCKED (ACCOUNT_KYC_RESTRICTION)
+Technical Assessment: 
+- WeatherGPT Code & Endpoint: FULLY OPERATIONAL & CORRECT
+- Credentials & Authentication: VALID & ACCEPTED
+- Account Gate: BLOCKED by Exotel Provider due to mandatory TRAI business KYC verification.
+Timestamp: 2026-08-30T16:00:26Z

@@ -1,0 +1,4 @@
+EXOTEL SMS DELIVERY STATUS
+============================================================
+Delivery Status: SIMULATED (DRY_RUN)
+Reason: EXOTEL_ACCOUNT_SID not set in .env; live SMS dispatch held safely in simulation mode.

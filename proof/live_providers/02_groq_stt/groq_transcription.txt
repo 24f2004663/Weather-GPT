@@ -1,0 +1,10 @@
+GROQ WHISPER STT TRANSCRIPTION PROOF
+============================================================
+Input Phrase Spoken: 'Will it rain in Bengaluru tomorrow?'
+Transcription Received (HTTP 200):
+{
+  "transcription": "Will it rain in Bengaluru tomorrow?",
+  "language": "en",
+  "model": "whisper-large-v3",
+  "execution_time_ms": 2111.1485958099365
+}

@@ -1,0 +1,4 @@
+WEB PUSH / NOTIFICATION CONTROLLED FAILURE TEST
+============================================================
+Invalid Channel (HTTP 422):
+{"detail":[{"type":"enum","loc":["body","channel"],"msg":"Input should be 'WHATSAPP', 'SMS', 'VOICE_IVR' or 'WEB_PUSH'","input":"INVALID_CHANNEL","ctx":{"expected":"'WHATSAPP', 'SMS', 'VOICE_IVR' or 'WEB_PUSH'"}}]}

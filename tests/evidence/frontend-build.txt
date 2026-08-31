@@ -1,0 +1,29 @@
+
+> weathergpt-frontend@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.35
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/4) ...
+   Generating static pages (1/4) 
+   Generating static pages (2/4) 
+   Generating static pages (3/4) 
+ ✓ Generating static pages (4/4)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    22.9 kB         110 kB
+└ ○ /_not-found                          873 B          88.2 kB
++ First Load JS shared by all            87.3 kB
+  ├ chunks/117-82b582a237222c67.js       31.7 kB
+  ├ chunks/fd9d1056-faca5e55fb7642b2.js  53.6 kB
+  └ other shared chunks (total)          1.92 kB
+
+
+○  (Static)  prerendered as static content
+

@@ -1,0 +1,453 @@
+import unittest
+import asyncio
+import httpx
+from unittest.mock import patch, MagicMock
+from datetime import datetime
+from fastapi.testclient import TestClient
+
+from backend.main import app
+from backend.core.config import settings
+from backend.schemas.alerts import DisasterAlert, AlertSeverity, AlertUrgency, AlertCertainty, AlertStatus, GeographicScope
+from backend.schemas.chat import ChatResponse, ChatMessage
+from backend.schemas.notifications import (
+    NotificationSubscription,
+    SubscriptionRequest,
+    NotificationChannel,
+    NotificationStatus,
+    NotificationPayload,
+    DisasterAlertTriggeredEvent,
+    normalize_phone_number,
+    mask_phone_number,
+)
+from backend.services.notifications.whatsapp import WhatsAppNotificationAdapter
+from backend.services.notifications.exotel import ExotelSMSAdapter
+from backend.services.notifications.voice import ExotelVoiceAdapter
+from backend.services.notifications.twilio_sms import TwilioSMSAdapter
+from backend.services.notifications.twilio_voice import TwilioVoiceAdapter
+from backend.services.notifications.twilio_whatsapp import TwilioWhatsAppAdapter
+from backend.services.notifications.web_push import WebPushNotificationAdapter
+from backend.services.notifications.orchestrator import NotificationOrchestrator
+from backend.services.notifications.formatter import format_whatsapp_alert, format_sms_alert, format_voice_script
+
+def create_sample_alert(severity=AlertSeverity.EXTREME, state="Tamil Nadu", district="Chennai"):
+    return DisasterAlert(
+        alert_id="ALERT-TEST-001",
+        title="Cyclone Warning",
+        event_type="Cyclone",
+        severity=severity,
+        urgency=AlertUrgency.IMMEDIATE,
+        certainty=AlertCertainty.OBSERVED,
+        status=AlertStatus.ACTUAL,
+        headline="Severe Cyclone Warning",
+        description="Very heavy rain expected.",
+        instruction="Stay indoors in secure shelters.",
+        affected_area=f"{state} ({district})",
+        scope=GeographicScope.DISTRICT,
+        affected_states=[state],
+        affected_districts=[district],
+        issued_time=datetime.utcnow(),
+        is_active=True
+    )
+
+class TestNotificationServices(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+        self.orchestrator = NotificationOrchestrator()
+
+    # 1. WhatsApp Dry Run & Live Mocks
+    def test_whatsapp_dry_run(self):
+        adapter = WhatsAppNotificationAdapter(dry_run=True)
+        payload = NotificationPayload(
+            recipient_identifier="+919876543210",
+            channel=NotificationChannel.WHATSAPP,
+            title="Alert",
+            message="Test Cyclone Alert"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SIMULATED)
+        self.assertTrue(res.is_simulated)
+        self.assertTrue(res.provider_reference.startswith("sim_wa_"))
+
+    @patch("httpx.AsyncClient.post")
+    def test_whatsapp_mocked_http_success(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"messages": [{"id": "wamid.12345"}]}
+        mock_post.return_value = mock_resp
+
+        adapter = WhatsAppNotificationAdapter(api_token="mock_token", phone_number_id="123456", dry_run=False)
+        payload = NotificationPayload(
+            recipient_identifier="+919876543210",
+            channel=NotificationChannel.WHATSAPP,
+            title="Alert",
+            message="Test Alert"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SENT)
+        self.assertEqual(res.provider_reference, "wamid.12345")
+
+    @patch("httpx.AsyncClient.post")
+    def test_whatsapp_mocked_429_rate_limit(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 429
+        mock_resp.text = "Rate limited"
+        mock_post.return_value = mock_resp
+
+        adapter = WhatsAppNotificationAdapter(api_token="mock_token", phone_number_id="123456", dry_run=False)
+        payload = NotificationPayload(
+            recipient_identifier="+919876543210",
+            channel=NotificationChannel.WHATSAPP,
+            title="Alert",
+            message="Test Alert"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.RETRYING)
+
+    # 2. Exotel SMS Dry Run & Mocked
+    def test_exotel_sms_dry_run(self):
+        adapter = ExotelSMSAdapter(dry_run=True)
+        payload = NotificationPayload(
+            recipient_identifier="+919876543210",
+            channel=NotificationChannel.SMS,
+            title="Alert",
+            message="SMS Warning"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SIMULATED)
+        self.assertTrue(res.provider_reference.startswith("sim_sms_"))
+
+    @patch("httpx.AsyncClient.post")
+    def test_exotel_sms_mocked_success(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"SMSMessage": {"Sid": "exo_sms_789"}}
+        mock_post.return_value = mock_resp
+
+        adapter = ExotelSMSAdapter(account_sid="acc_1", api_key="k_1", api_token="t_1", dry_run=False)
+        payload = NotificationPayload(
+            recipient_identifier="+919876543210",
+            channel=NotificationChannel.SMS,
+            title="Alert",
+            message="SMS Warning"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SENT)
+        self.assertEqual(res.provider_reference, "exo_sms_789")
+
+    # 3. Exotel Voice / IVR Dry Run & Mocked
+    def test_exotel_voice_dry_run(self):
+        adapter = ExotelVoiceAdapter(dry_run=True)
+        payload = NotificationPayload(
+            recipient_identifier="+919876543210",
+            channel=NotificationChannel.VOICE_IVR,
+            title="Alert",
+            message="Spoken Alert"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SIMULATED)
+        self.assertTrue(res.provider_reference.startswith("sim_call_"))
+
+    # 4. Web Push Adapter Dry Run & Live Key Guard
+    def test_web_push_dry_run(self):
+        adapter = WebPushNotificationAdapter(dry_run=True)
+        payload = NotificationPayload(
+            recipient_identifier="user_web_token_123",
+            channel=NotificationChannel.WEB_PUSH,
+            title="Cyclone Warning",
+            message="Extreme Cyclone Warning issued for Chennai.",
+            alert_id="ALERT-001"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SIMULATED)
+        self.assertTrue(res.is_simulated)
+        self.assertTrue(res.provider_reference.startswith("sim_push_"))
+
+    def test_web_push_missing_keys_guard(self):
+        adapter = WebPushNotificationAdapter(public_key=None, private_key=None, dry_run=False)
+        payload = NotificationPayload(
+            recipient_identifier="user_web_token_123",
+            channel=NotificationChannel.WEB_PUSH,
+            title="Cyclone Warning",
+            message="Alert message",
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.FAILED)
+        self.assertIn("VAPID keys not configured", res.error_message)
+
+    # 5. Phone Number Normalization & Masking
+    def test_phone_normalization_and_masking(self):
+        self.assertEqual(normalize_phone_number("+91 98765 43210"), "+919876543210")
+        self.assertEqual(normalize_phone_number("9876543210"), "9876543210")
+        with self.assertRaises(ValueError):
+            normalize_phone_number("123") # Too short
+
+        masked = mask_phone_number("+919876543210")
+        self.assertEqual(masked, "+91 9876 ****10")
+
+    # 6. Orchestrator Subscription Management & Validation
+    def test_subscription_lifecycle(self):
+        req = SubscriptionRequest(
+            user_identifier="user_123",
+            phone_number="+919876543210",
+            preferred_language="ta",
+            enabled_channels=[NotificationChannel.WHATSAPP, NotificationChannel.SMS],
+            min_severity_threshold=AlertSeverity.SEVERE,
+            target_states=["Tamil Nadu"],
+            target_districts=["Chennai"]
+        )
+        sub = asyncio.run(self.orchestrator.save_subscription(req))
+        self.assertEqual(sub.user_identifier, "user_123")
+        self.assertEqual(len(sub.enabled_channels), 2)
+
+        fetched = asyncio.run(self.orchestrator.get_subscription("user_123"))
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched.preferred_language, "ta")
+
+        deleted = asyncio.run(self.orchestrator.delete_subscription("user_123"))
+        self.assertTrue(deleted)
+        self.assertIsNone(asyncio.run(self.orchestrator.get_subscription("user_123")))
+
+    # 7. Orchestrator Severity & Geographic Filtering
+    def test_orchestrator_severity_and_geo_filter(self):
+        asyncio.run(self.orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier="user_chennai",
+            phone_number="+919876543210",
+            enabled_channels=[NotificationChannel.SMS],
+            min_severity_threshold=AlertSeverity.SEVERE,
+            target_states=["Tamil Nadu"],
+            target_districts=["Chennai"]
+        )))
+
+        asyncio.run(self.orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier="user_mumbai",
+            phone_number="+919999999999",
+            enabled_channels=[NotificationChannel.SMS],
+            min_severity_threshold=AlertSeverity.MODERATE,
+            target_states=["Maharashtra"],
+            target_districts=["Mumbai"]
+        )))
+
+        # Event A: Extreme Cyclone in Chennai
+        alert_chennai = create_sample_alert(severity=AlertSeverity.EXTREME, state="Tamil Nadu", district="Chennai")
+        records_a = asyncio.run(self.orchestrator.handle_alert_event(DisasterAlertTriggeredEvent(
+            event_id="evt_1",
+            alert=alert_chennai
+        )))
+
+        # Should match Chennai user only
+        self.assertEqual(len(records_a), 1)
+
+        # Event B: Minor Heat Wave in Chennai (below threshold)
+        alert_minor = create_sample_alert(severity=AlertSeverity.MINOR, state="Tamil Nadu", district="Chennai")
+        alert_minor.alert_id = "ALERT-MINOR-002"
+        records_b = asyncio.run(self.orchestrator.handle_alert_event(DisasterAlertTriggeredEvent(
+            event_id="evt_2",
+            alert=alert_minor
+        )))
+        self.assertEqual(len(records_b), 0)
+
+    # 8. Orchestrator Idempotency (Duplicate Suppression & Concurrency)
+    def test_orchestrator_idempotency(self):
+        asyncio.run(self.orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier="user_dup",
+            phone_number="+919876543210",
+            enabled_channels=[NotificationChannel.WHATSAPP],
+            min_severity_threshold=AlertSeverity.SEVERE,
+            target_states=["Tamil Nadu"]
+        )))
+
+        alert = create_sample_alert()
+        # First trigger
+        rec_1 = asyncio.run(self.orchestrator.handle_alert_event(DisasterAlertTriggeredEvent(
+            event_id="evt_101",
+            alert=alert
+        )))
+        self.assertEqual(len(rec_1), 1)
+
+        # Immediate second trigger with same alert_id
+        rec_2 = asyncio.run(self.orchestrator.handle_alert_event(DisasterAlertTriggeredEvent(
+            event_id="evt_102",
+            alert=alert
+        )))
+        self.assertEqual(len(rec_2), 0) # Suppressed
+
+    # 9. Multilingual Message Formatting
+    def test_multilingual_formatting(self):
+        alert = create_sample_alert()
+        msg_en = format_whatsapp_alert(alert, language="en")
+        self.assertIn("WEATHERGPT OFFICIAL DISASTER ALERT", msg_en)
+
+        msg_hi = format_whatsapp_alert(alert, language="hi")
+        self.assertIn("आधिकारिक आपदा चेतावनी", msg_hi)
+
+        msg_ta = format_whatsapp_alert(alert, language="ta")
+        self.assertIn("அதிகாரப்பூர்வ பேரிடர் எச்சரிக்கை", msg_ta)
+
+        sms_hi = format_sms_alert(alert, language="hi")
+        self.assertIn("आपदा अलर्ट", sms_hi)
+
+        voice_en = format_voice_script(alert, language="en")
+        self.assertIn("official WeatherGPT emergency", voice_en)
+
+    # 10. Preferences REST API Endpoints & VAPID Key API
+    def test_preferences_api_endpoints(self):
+        payload = {
+            "user_identifier": "test_api_user",
+            "phone_number": "+919876543210",
+            "preferred_language": "hi",
+            "enabled_channels": ["WHATSAPP", "SMS"],
+            "min_severity_threshold": "Severe",
+            "target_states": ["Tamil Nadu"],
+            "is_opted_in": True
+        }
+        res_post = self.client.post("/api/notifications/preferences", json=payload)
+        self.assertEqual(res_post.status_code, 200)
+        data = res_post.json()
+        self.assertEqual(data["user_identifier"], "test_api_user")
+
+        res_get = self.client.get("/api/notifications/preferences?user_id=test_api_user")
+        self.assertEqual(res_get.status_code, 200)
+        self.assertEqual(res_get.json()["preferred_language"], "hi")
+
+        # Provider status endpoint
+        res_prov = self.client.get("/api/notifications/providers/status")
+        self.assertEqual(res_prov.status_code, 200)
+        self.assertIn("channels", res_prov.json())
+        self.assertIn("WEB_PUSH", res_prov.json()["channels"])
+        self.assertIn("restart_persistence", res_prov.json())
+
+        # VAPID public key endpoint
+        res_vapid = self.client.get("/api/notifications/vapid-public-key")
+        self.assertEqual(res_vapid.status_code, 200)
+        self.assertIn("status", res_vapid.json())
+        self.assertIn("claim_email", res_vapid.json())
+
+        # Preview endpoint
+        res_prev = self.client.post("/api/notifications/preview", json={
+            "channel": "WHATSAPP",
+            "language": "hi",
+            "recipient": "+919876543210"
+        })
+        self.assertEqual(res_prev.status_code, 200)
+        self.assertIn("आधिकारिक", res_prev.json()["formatted_message"])
+
+        # Unsubscribe
+        res_del = self.client.delete("/api/notifications/preferences?user_id=test_api_user")
+        self.assertEqual(res_del.status_code, 200)
+        self.assertEqual(res_del.json()["status"], "unsubscribed")
+
+    # 11. Preview Endpoint Safety
+    def test_preview_endpoint_strictly_simulated(self):
+        res = self.client.post("/api/notifications/preview", json={
+            "channel": "SMS",
+            "language": "en",
+            "recipient": "+919876543210"
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["dry_run"])
+
+    # 12. Cross User Isolation
+    def test_cross_user_isolation(self):
+        asyncio.run(self.orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier="user_alpha",
+            phone_number="+919876543210",
+            preferred_language="en",
+            enabled_channels=[NotificationChannel.SMS]
+        )))
+
+        asyncio.run(self.orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier="user_beta",
+            phone_number="+919123456789",
+            preferred_language="hi",
+            enabled_channels=[NotificationChannel.WHATSAPP]
+        )))
+
+        sub_a = asyncio.run(self.orchestrator.get_subscription("user_alpha"))
+        sub_b = asyncio.run(self.orchestrator.get_subscription("user_beta"))
+        self.assertNotEqual(sub_a.phone_number, sub_b.phone_number)
+        self.assertNotEqual(sub_a.preferred_language, sub_b.preferred_language)
+
+    # 13. Twilio SMS Adapter Tests
+    def test_twilio_sms_dry_run(self):
+        adapter = TwilioSMSAdapter(dry_run=True)
+        payload = NotificationPayload(
+            alert_id="TEST-TW-SMS",
+            channel=NotificationChannel.SMS,
+            title="Flood Warning",
+            message="Flood alert for zone A",
+            priority="high",
+            recipient_identifier="+919876543210"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SIMULATED)
+        self.assertTrue(res.is_simulated)
+
+    def test_twilio_sms_missing_config_fails_gracefully(self):
+        adapter = TwilioSMSAdapter(account_sid=None, auth_token=None, from_number=None, dry_run=False)
+        payload = NotificationPayload(
+            alert_id="TEST-TW-SMS",
+            channel=NotificationChannel.SMS,
+            title="Flood Warning",
+            message="Flood alert for zone A",
+            priority="high",
+            recipient_identifier="+919876543210"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.FAILED)
+        self.assertIn("not configured", res.error_message)
+
+    # 14. Twilio Voice Adapter Tests
+    def test_twilio_voice_dry_run(self):
+        adapter = TwilioVoiceAdapter(dry_run=True)
+        payload = NotificationPayload(
+            alert_id="TEST-TW-VOICE",
+            channel=NotificationChannel.VOICE_IVR,
+            title="Cyclone Warning",
+            message="Cyclone alert. Seek shelter immediately.",
+            priority="high",
+            recipient_identifier="+919876543210"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SIMULATED)
+        self.assertTrue(res.is_simulated)
+
+    def test_twilio_voice_twiml_generation(self):
+        adapter = TwilioVoiceAdapter(dry_run=True)
+        twiml = adapter._build_twiml("Severe storm alert.")
+        self.assertIn("<Response>", twiml)
+        self.assertIn("<Say", twiml)
+        self.assertIn("Severe storm alert.", twiml)
+
+    # 15. Twilio WhatsApp Adapter Tests
+    def test_twilio_whatsapp_dry_run(self):
+        adapter = TwilioWhatsAppAdapter(dry_run=True)
+        payload = NotificationPayload(
+            alert_id="TEST-TW-WA",
+            channel=NotificationChannel.WHATSAPP,
+            title="Heatwave Alert",
+            message="Heatwave warning in effect.",
+            priority="high",
+            recipient_identifier="+919876543210"
+        )
+        res = asyncio.run(adapter.send_notification(payload))
+        self.assertEqual(res.status, NotificationStatus.SIMULATED)
+        self.assertTrue(res.is_simulated)
+
+    # 16. Twilio WhatsApp Inbound Webhook Test
+    def test_twilio_whatsapp_inbound_webhook_returns_twiml(self):
+        with patch("backend.services.ai.gemini.gemini_ai_service.generate_weather_response") as mock_gemini:
+            mock_gemini.return_value = ChatResponse(
+                response_message=ChatMessage(role="model", content="It will not rain in Chennai today."),
+                session_id="test_wa_session",
+                tools_used=[]
+            )
+            res = self.client.post("/api/notifications/webhook/twilio-whatsapp", data={
+                "From": "whatsapp:+919876543210",
+                "Body": "Will it rain today in Chennai?",
+                "ProfileName": "Manoj"
+            })
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("application/xml", res.headers["content-type"])
+            self.assertIn("<Response><Message>", res.text)
+            self.assertIn("It will not rain in Chennai today.", res.text)

@@ -1,0 +1,29 @@
+COMPLETE USER JOURNEYS PROOF
+============================================================
+JOURNEY A: Normal Weather User
+- Step 1: Open WeatherGPT homepage (http://localhost:3000).
+- Step 2: Search and select Bengaluru (12.97°N, 77.59°E).
+- Step 3: View current meteorological observation, apparent temp, and humidity.
+- Step 4: Inspect 24-hour hourly trend and 7-day synoptic forecast.
+- Step 5: Read personalized daily decision advice (Umbrella / UV / Heat / Outdoor Window).
+- Result: VERIFIED.
+
+JOURNEY B: Multilingual Regional User
+- Step 1: Switch language selector to Hindi (हिन्दी) or Tamil (தமிழ்).
+- Step 2: Observe instant translation of all metric labels, headers, and advice cards.
+- Step 3: Official SACHET disaster bulletin source preserved with legal accuracy.
+- Result: VERIFIED.
+
+JOURNEY C: Emergency Disaster Alert & Notification User
+- Step 1: Observe active/synced official SACHET/NDMA disaster alert feed.
+- Step 2: Open Disaster Alert Settings modal.
+- Step 3: Configure phone number (+919876543210), channels (SMS, Voice IVR, Web Push), and severity (Severe).
+- Step 4: Preview disaster alert formatting across channels and languages in DRY_RUN mode.
+- Step 5: Unsubscribe with single click.
+- Result: VERIFIED.
+
+JOURNEY D: Voice & Accessibility User
+- Step 1: Audio microphone UI loaded with permission and recording controls.
+- Step 2: SpeechSynthesis TTS voice playback controls active on AI and informational messages.
+- Step 3: Graceful fallback when optional STT cloud key is unconfigured.
+- Result: VERIFIED.

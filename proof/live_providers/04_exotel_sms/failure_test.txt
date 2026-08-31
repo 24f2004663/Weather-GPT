@@ -1,0 +1,4 @@
+EXOTEL SMS CONTROLLED FAILURE TEST
+============================================================
+Test: Dispatching without configured EXOTEL_ACCOUNT_SID
+Observed: Application fails safely with FAILED status and non-sensitive error message.

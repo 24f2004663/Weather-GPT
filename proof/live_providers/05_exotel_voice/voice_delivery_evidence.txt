@@ -1,0 +1,4 @@
+EXOTEL VOICE DELIVERY STATUS
+============================================================
+Delivery Status: SIMULATED (DRY_RUN)
+Reason: Missing EXOTEL_ACCOUNT_SID / EXOTEL_CALLER_ID; call not initiated.

@@ -1,0 +1,40 @@
+VOICE IVR EMERGENCY NOTIFICATION PROOF (DRY RUN)
+============================================================
+Mode: NOTIFICATION_DRY_RUN=true
+Zero live phone calls initiated.
+
+1. Hindi SSML Emergency Script:
+{
+  "channel": "VOICE_IVR",
+  "language": "hi",
+  "recipient": "+91 9876 ****10",
+  "formatted_message": "\u092f\u0939 \u0935\u0947\u0926\u0930 \u091c\u0940\u092a\u0940\u091f\u0940 \u0915\u0940 \u0906\u0927\u093f\u0915\u093e\u0930\u093f\u0915 \u0906\u092a\u0926\u093e \u091a\u0947\u0924\u093e\u0935\u0928\u0940 \u0939\u0948\u0964 Coastal Tamil Nadu (Chennai, Tiruvallur) \u0915\u0947 \u0932\u093f\u090f Cyclone \u0915\u0940 Extreme \u091a\u0947\u0924\u093e\u0935\u0928\u0940 \u091c\u093e\u0930\u0940 \u0915\u0940 \u0917\u0908 \u0939\u0948\u0964 \u0915\u0943\u092a\u092f\u093e \u0928\u093f\u0930\u094d\u0926\u0947\u0936 \u0915\u093e \u092a\u093e\u0932\u0928 \u0915\u0930\u0947\u0902: Fishermen are advised not to venture into sea. Stay indoors in secure shelters. \u0938\u094d\u0930\u094b\u0924: \u090f\u0928 \u0921\u0940 \u090f\u092e \u090f\u0964",
+  "provider": "Exotel",
+  "dry_run": true,
+  "metadata": {
+    "alert_id": "SAMPLE-ALERT-101",
+    "event_type": "Cyclone",
+    "severity": "Extreme",
+    "scope": "District"
+  }
+}
+
+2. English SSML Emergency Script:
+{
+  "channel": "VOICE_IVR",
+  "language": "en",
+  "recipient": "+91 9876 ****10",
+  "formatted_message": "This is an official WeatherGPT emergency disaster bulletin. An official Cyclone alert of Extreme severity has been issued for Coastal Tamil Nadu (Chennai, Tiruvallur). Official instruction: Fishermen are advised not to venture into sea. Stay indoors in secure shelters. Source: SACHET NDMA.",
+  "provider": "Exotel",
+  "dry_run": true,
+  "metadata": {
+    "alert_id": "SAMPLE-ALERT-101",
+    "event_type": "Cyclone",
+    "severity": "Extreme",
+    "scope": "District"
+  }
+}
+
+3. Features:
+- Standard SSML <speak><p><s> tags with prosody rate controls.
+- Clear instruction repetition for disaster compliance.

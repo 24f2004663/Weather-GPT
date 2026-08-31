@@ -1,0 +1,32 @@
+WEB PUSH EMERGENCY NOTIFICATION PROOF (DRY RUN)
+============================================================
+1. VAPID Public Key Endpoint (GET /api/notifications/vapid-public-key):
+HTTP Status: 200
+Response:
+{
+  "public_key": null,
+  "status": "NOT_CONFIGURED",
+  "claim_email": "admin@weathergpt.local"
+}
+
+2. Web Push Tamil Notification Payload Preview (POST /api/notifications/preview):
+HTTP Status: 200
+Response:
+{
+  "channel": "WEB_PUSH",
+  "language": "ta",
+  "recipient": "moc k_br ****en",
+  "formatted_message": "Severe Cyclonic Storm Advancing Towards Coast",
+  "provider": "VAPID Web Push",
+  "dry_run": true,
+  "metadata": {
+    "alert_id": "SAMPLE-ALERT-101",
+    "event_type": "Cyclone",
+    "severity": "Extreme",
+    "scope": "District"
+  }
+}
+
+3. Security Verification:
+- Private VAPID key is never returned in any API response or frontend bundle.
+- Service Worker registration flow verified in dry-run mode.

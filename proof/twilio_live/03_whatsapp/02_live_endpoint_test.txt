@@ -1,0 +1,26 @@
+TWILIO WHATSAPP LIVE SANDBOX ENDPOINT TEST EVIDENCE
+============================================================
+Date: 2026-08-31
+Target Endpoint: https://api.twilio.com/2010-04-01/Accounts/***/Messages.json
+Provider Adapter: TwilioWhatsAppAdapter (backend/services/notifications/twilio_whatsapp.py)
+Sender (TWILIO_WHATSAPP_FROM): whatsapp:+14 1552 ****86 (Masked Twilio Sandbox Number)
+Recipient (TWILIO_WHATSAPP_TO): whatsapp:+91 9042 ****20 (Masked Handset)
+Message Dispatched: "🚨 *WeatherGPT Emergency Alert*: Cyclone Warning for Chennai. Severe weather test via Twilio WhatsApp Sandbox."
+
+Provider HTTP Status: 400 Bad Request
+Twilio Error Code: 21654
+Twilio Error Message: "ContentSid Required"
+Twilio Documentation Link: https://www.twilio.com/docs/errors/21654
+
+Backend Pipeline Tracing:
+1. Orchestrator Route: NotificationOrchestrator._dispatch_to_adapter(NotificationChannel.WHATSAPP, payload)
+2. Adapter Invocation: TwilioWhatsAppAdapter.send_notification()
+3. Result: NotificationStatus.FAILED
+4. Error Classified: Twilio WhatsApp API error 21654: ContentSid Required
+
+Exact Blocking Reason & Diagnostic Breakdown:
+- Meta / Twilio WhatsApp Platform Requirement: All outbound WhatsApp messages sent outside an active 24-hour inbound conversation window require a pre-registered Meta Content Template (`ContentSid`).
+- Freeform text `Body` parameters are blocked by Twilio/Meta when an unapproved message is dispatched outside an inbound 24-hour conversational session.
+- Twilio trial accounts do not have access to the Content API to dynamically provision custom `ContentSid` templates (Twilio Error 20003: "This feature is not available on a Trial account. Please upgrade your account to gain access.").
+
+Final Classification: REAL_PROVIDER_REJECTED (CONTENT_TEMPLATE_REQUIRED / 24H_SESSION_GATED)

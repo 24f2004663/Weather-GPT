@@ -1,0 +1,51 @@
+NOTIFICATION PREFERENCES LIFE CYCLE PROOF
+============================================================
+1. Save Subscription (POST /api/notifications/preferences):
+HTTP Status: 200
+Response:
+{
+  "subscription_id": "791cf68d-08e5-474e-82f7-0294c9223876",
+  "user_identifier": "proof_user_001",
+  "phone_number": "+919876543210",
+  "whatsapp_number": "+919876543210",
+  "preferred_language": "en",
+  "enabled_channels": [
+    "WEB_PUSH"
+  ],
+  "min_severity_threshold": "Severe",
+  "target_states": [],
+  "target_districts": [],
+  "push_subscription": null,
+  "is_opted_in": true,
+  "created_at": "2026-08-30T13:17:07.599045",
+  "updated_at": "2026-08-30T13:17:07.599054"
+}
+
+2. Retrieve Subscription (GET /api/notifications/preferences):
+HTTP Status: 200
+Response:
+{
+  "subscription_id": "791cf68d-08e5-474e-82f7-0294c9223876",
+  "user_identifier": "proof_user_001",
+  "phone_number": "+919876543210",
+  "whatsapp_number": "+919876543210",
+  "preferred_language": "en",
+  "enabled_channels": [
+    "WEB_PUSH"
+  ],
+  "min_severity_threshold": "Severe",
+  "target_states": [],
+  "target_districts": [],
+  "push_subscription": null,
+  "is_opted_in": true,
+  "created_at": "2026-08-30T13:17:07.599045",
+  "updated_at": "2026-08-30T13:17:07.599054"
+}
+
+3. Unsubscribe (DELETE /api/notifications/preferences):
+HTTP Status: 200
+Response:
+{
+  "status": "unsubscribed",
+  "user_identifier": "proof_user_001"
+}

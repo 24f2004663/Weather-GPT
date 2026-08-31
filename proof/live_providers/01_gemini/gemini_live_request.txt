@@ -1,0 +1,28 @@
+GEMINI LIVE REQUEST METADATA
+============================================================
+Endpoint: POST /api/chat
+Provider Target: Google Gemini (gemini-1.5-pro / gemini-2.5-flash)
+
+Request 1 Payload:
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "What is the current weather in Bengaluru?"
+    }
+  ],
+  "session_id": "live_test_sess_001",
+  "language_preference": "en"
+}
+
+Request 2 Payload:
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "What will the weather be like tomorrow in Chennai?"
+    }
+  ],
+  "session_id": "live_test_sess_001",
+  "language_preference": "en"
+}

@@ -1,0 +1,9 @@
+VAPID PUBLIC KEY ENDPOINT VERIFICATION
+============================================================
+Endpoint: GET /api/notifications/vapid-public-key
+HTTP Status: 200
+Status Flag: CONFIGURED
+Public Key Configured: True
+Claim Email: mailto:manojkofficial557@gmail.com
+
+Private VAPID Key Check: NOT PRESENT in response body (PASS)
