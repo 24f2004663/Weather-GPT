@@ -12,7 +12,7 @@ from backend.schemas.alerts import AlertSeverity
 class SupabaseClient:
     """
     Authoritative Supabase Database & REST Adapter for Emergency Alert Subscriptions.
-    Communicates securely with Supabase PostgREST without exposing raw secrets.
+    Communicates securely with Supabase PostgREST (public.alert_subscriptions) without exposing raw secrets.
     """
     def __init__(self):
         self.url = (settings.SUPABASE_URL or "").rstrip("/")
@@ -37,9 +37,11 @@ class SupabaseClient:
 
     async def save_subscription(self, sub: NotificationSubscription) -> bool:
         """
-        Persists or updates an Emergency Alert subscription in Supabase.
+        Persists or updates an Emergency Alert subscription in Supabase (public.alert_subscriptions).
+        Returns True ONLY if the database write succeeded.
         """
         if not self.has_credentials:
+            logger.error("SupabaseClient.save_subscription called but Supabase credentials are not configured.")
             return False
 
         payload = {
@@ -64,7 +66,7 @@ class SupabaseClient:
         }
 
         endpoint = f"{self.url}/rest/v1/{self._table}?on_conflict=user_identifier"
-        headers = self._get_headers(prefer="resolution=merge-duplicates,return=minimal")
+        headers = self._get_headers(prefer="resolution=merge-duplicates,return=representation")
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -72,15 +74,15 @@ class SupabaseClient:
                 if res.status_code in (200, 201, 204):
                     logger.info(f"Supabase successfully persisted subscription for: {sub.user_identifier}")
                     return True
-                logger.warning(f"Supabase upsert failed with HTTP {res.status_code}: {res.text[:200]}")
+                logger.error(f"Supabase upsert failed with HTTP {res.status_code}: {res.text[:200]}")
                 return False
         except Exception as e:
-            logger.error(f"Supabase save_subscription network error: {str(e)}")
+            logger.error(f"Supabase save_subscription network/connection error: {str(e)}")
             return False
 
     async def get_subscription(self, user_identifier: str) -> Optional[NotificationSubscription]:
         """
-        Retrieves a user's subscription record from Supabase.
+        Retrieves a user's subscription record directly from Supabase.
         """
         if not self.has_credentials:
             return None
@@ -108,7 +110,7 @@ class SupabaseClient:
 
     async def delete_subscription(self, user_identifier: str) -> bool:
         """
-        Deactivates or removes a subscription in Supabase.
+        Removes a subscription record directly from Supabase.
         """
         if not self.has_credentials:
             return False
@@ -119,32 +121,24 @@ class SupabaseClient:
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                # Set is_opted_in = False to preserve historical integrity and immediately revoke access
-                res = await client.patch(
-                    endpoint,
-                    headers=headers,
-                    params=params,
-                    json={"is_opted_in": False, "updated_at": datetime.utcnow().isoformat()}
-                )
+                res = await client.delete(endpoint, headers=headers, params=params)
                 if res.status_code in (200, 204):
-                    logger.info(f"Supabase subscription deactivated for: {user_identifier}")
+                    logger.info(f"Supabase subscription deleted for: {user_identifier}")
                     return True
+                logger.error(f"Supabase delete_subscription failed HTTP {res.status_code}")
                 return False
         except Exception as e:
             logger.error(f"Supabase delete_subscription error: {str(e)}")
             return False
 
-    async def is_phone_subscribed(self, phone: str) -> Optional[bool]:
+    async def is_phone_subscribed(self, phone: str) -> bool:
         """
         Performs an authoritative live query against Supabase to verify if a phone number
         belongs to an active, opted-in Emergency Alert subscriber.
-        Returns:
-            True: if explicitly verified active in Supabase
-            False: if found inactive or not found in Supabase
-            None: if Supabase is unconfigured / unreachable (falls back to local memory store)
+        Returns True if verified active in Supabase, False otherwise.
         """
         if not self.has_credentials:
-            return None
+            return False
 
         clean_target = "".join(c for c in phone if c.isdigit())
         if not clean_target:
@@ -178,10 +172,36 @@ class SupabaseClient:
                                 return True
                     return False
                 logger.warning(f"Supabase is_phone_subscribed HTTP {res.status_code}")
-                return None
+                return False
         except Exception as e:
             logger.error(f"Supabase is_phone_subscribed query error: {str(e)}")
-            return None
+            return False
+
+    async def get_all_active_subscriptions(self) -> List[NotificationSubscription]:
+        """
+        Retrieves all active (is_opted_in=true) subscriptions directly from Supabase.
+        """
+        if not self.has_credentials:
+            return []
+
+        endpoint = f"{self.url}/rest/v1/{self._table}"
+        params = {
+            "is_opted_in": "eq.true",
+            "select": "*",
+        }
+        headers = self._get_headers()
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.get(endpoint, headers=headers, params=params)
+                if res.status_code == 200:
+                    rows = res.json()
+                    return [self._row_to_subscription(r) for r in rows]
+                logger.warning(f"Supabase get_all_active_subscriptions HTTP {res.status_code}")
+                return []
+        except Exception as e:
+            logger.error(f"Supabase get_all_active_subscriptions error: {str(e)}")
+            return []
 
     def _row_to_subscription(self, row: Dict[str, Any]) -> NotificationSubscription:
         channels = []

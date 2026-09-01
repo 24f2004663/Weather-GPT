@@ -1,6 +1,7 @@
 import unittest
 import asyncio
 import httpx
+from typing import Dict, List, Optional, Any
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 from fastapi.testclient import TestClient
@@ -49,10 +50,59 @@ def create_sample_alert(severity=AlertSeverity.EXTREME, state="Tamil Nadu", dist
         is_active=True
     )
 
+class MockSupabaseClient:
+    def __init__(self):
+        self._db: Dict[str, NotificationSubscription] = {}
+        self.url = "https://mock.supabase.co"
+        self.key = "mock_key"
+        self.has_credentials = True
+
+    def is_configured(self) -> bool:
+        return True
+
+    async def save_subscription(self, sub: NotificationSubscription) -> bool:
+        self._db[sub.user_identifier] = sub
+        return True
+
+    async def get_subscription(self, user_identifier: str) -> Optional[NotificationSubscription]:
+        return self._db.get(user_identifier)
+
+    async def delete_subscription(self, user_identifier: str) -> bool:
+        if user_identifier in self._db:
+            del self._db[user_identifier]
+            return True
+        return False
+
+    async def is_phone_subscribed(self, phone: str) -> bool:
+        clean_target = "".join(c for c in phone if c.isdigit())
+        if not clean_target:
+            return False
+        for sub in self._db.values():
+            if not sub.is_opted_in:
+                continue
+            for cp in [sub.phone_number, sub.whatsapp_number, sub.user_identifier]:
+                if not cp:
+                    continue
+                clean_cp = "".join(c for c in str(cp) if c.isdigit())
+                if clean_cp == clean_target:
+                    return True
+                if len(clean_cp) >= 10 and len(clean_target) >= 10 and clean_cp[-10:] == clean_target[-10:]:
+                    return True
+        return False
+
+    async def get_all_active_subscriptions(self) -> List[NotificationSubscription]:
+        return [s for s in self._db.values() if s.is_opted_in]
+
 class TestNotificationServices(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        self.mock_supabase = MockSupabaseClient()
+        self.patcher = patch("backend.services.notifications.orchestrator.supabase_client", self.mock_supabase)
+        self.patcher.start()
         self.orchestrator = NotificationOrchestrator()
+
+    def tearDown(self):
+        self.patcher.stop()
 
     # 1. WhatsApp Dry Run & Live Mocks
     def test_whatsapp_dry_run(self):
@@ -558,3 +608,18 @@ class TestNotificationServices(unittest.TestCase):
         mock_resp.json.return_value = []
         res2 = asyncio.run(client.is_phone_subscribed("+911234567890"))
         self.assertFalse(res2)
+
+    # 20. Supabase Failure Fails Closed with 503 (No Silent In-Memory Fallback)
+    def test_save_subscription_fails_503_when_supabase_unconfigured(self):
+        from backend.db.supabase import SupabaseClient
+        unconf_client = SupabaseClient()
+        unconf_client.has_credentials = False
+
+        with patch("backend.services.notifications.orchestrator.supabase_client", unconf_client):
+            res = self.client.post("/api/notifications/preferences", json={
+                "user_identifier": "unconf_user",
+                "phone_number": "+919876543210",
+                "is_opted_in": True
+            })
+            self.assertEqual(res.status_code, 503)
+            self.assertIn("Database persistence error", res.json()["detail"])

@@ -403,9 +403,9 @@ async def get_notification_providers_status(response: FastAPIResponse):
         channels=channels,
         dry_run_enabled=dry_run,
         live_tests_enabled=settings.ENABLE_LIVE_NOTIFICATION_TESTS,
-        subscription_store_mode="in_memory_prototype",
+        subscription_store_mode="supabase_authoritative_persistent",
         idempotency_store_mode="in_memory_prototype_24h",
-        restart_persistence=False
+        restart_persistence=True
     )
 
 @app.get("/api/notifications/vapid-public-key", response_model=VapidPublicKeyResponse, tags=["Notifications"])

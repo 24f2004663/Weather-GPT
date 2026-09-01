@@ -297,7 +297,8 @@ async function isAuthorizedSender(phone) {
   if (!phone || phone.length < 7) return false;
 
   try {
-    const isSubscribed = await checkBackendSubscriber(phone);
+    const fn = (module.exports && module.exports.checkBackendSubscriber) ? module.exports.checkBackendSubscriber : checkBackendSubscriber;
+    const isSubscribed = await fn(phone);
     return Boolean(isSubscribed);
   } catch (err) {
     log('error', { reason: 'subscriber_check_failed', error: err.message, phone_suffix: phone.slice(-4) });
@@ -342,7 +343,8 @@ async function handleMessage(socket, msg) {
   const phone = await resolveSenderPhone(socket, jid, msg);
 
   // 5. Emergency Alert Subscription Authorization check
-  const authorized = await isAuthorizedSender(phone);
+  const authFn = (module.exports && module.exports.isAuthorizedSender) ? module.exports.isAuthorizedSender : isAuthorizedSender;
+  const authorized = await authFn(phone);
   if (!authorized) {
     log('ignored', { reason: 'not_subscribed', phone_suffix: phone.slice(-4) });
     return;
@@ -380,7 +382,8 @@ async function handleMessage(socket, msg) {
   log('chat_request', { phone_suffix: phone.slice(-4), session_id: sessionId });
 
   try {
-    const response = await callWeatherGPTChat(text.trim(), sessionId);
+    const chatFn = (module.exports && module.exports.callWeatherGPTChat) ? module.exports.callWeatherGPTChat : callWeatherGPTChat;
+    const response = await chatFn(text.trim(), sessionId);
     log('chat_response', { phone_suffix: phone.slice(-4), response_length: response.length });
 
     // 9. Send response back via WhatsApp

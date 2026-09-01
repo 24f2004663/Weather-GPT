@@ -1,49 +1,16 @@
 /**
  * WeatherGPT WhatsApp Adapter — Unit Tests
  *
- * Tests all safety controls using mocks and backend API contracts.
+ * Tests all safety controls, authorization gates, and conversational handling using mocks.
  * Uses Node.js built-in test runner (node --test).
  */
 
 'use strict';
 
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
-const http = require('http');
 
 const adapter = require('../index.js');
-
-// Helper to register a test subscriber directly with backend for integration testing
-function registerTestSubscriber(phone) {
-  return new Promise((resolve) => {
-    const payload = JSON.stringify({
-      user_identifier: `test_user_${phone.replace(/\D/g, '')}`,
-      phone_number: phone,
-      whatsapp_number: phone,
-      enabled_channels: ['WHATSAPP'],
-      is_opted_in: true,
-    });
-
-    const req = http.request({
-      hostname: 'localhost',
-      port: 8000,
-      path: '/api/notifications/preferences',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
-      },
-      timeout: 3000,
-    }, (res) => {
-      resolve(res.statusCode >= 200 && res.statusCode < 300);
-    });
-
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => { req.destroy(); resolve(false); });
-    req.write(payload);
-    req.end();
-  });
-}
 
 // ---------------------------------------------------------------------------
 // Test: parseAllowedNumbers
@@ -112,27 +79,36 @@ describe('resolveSenderPhone', () => {
 // Test: Subscriber Authorization (isAuthorizedSender)
 // ---------------------------------------------------------------------------
 describe('isAuthorizedSender', () => {
-  it('authorizes registered alert subscriber phone number', async () => {
-    await registerTestSubscriber('+919042099020');
-    const isAuth = await adapter.isAuthorizedSender('919042099020');
-    assert.ok(isAuth, 'Registered subscriber must be authorized');
+  const originalCheck = adapter.checkBackendSubscriber;
+
+  afterEach(() => {
+    adapter.checkBackendSubscriber = originalCheck;
   });
 
-  it('rejects unregistered number', async () => {
+  it('authorizes registered alert subscriber when backend confirms subscription', async () => {
+    adapter.checkBackendSubscriber = async (phone) => phone === '919042099020';
+    const isAuth = await adapter.isAuthorizedSender('919042099020');
+    assert.ok(isAuth, 'Active subscriber must be authorized');
+  });
+
+  it('rejects unregistered number when backend denies subscription', async () => {
+    adapter.checkBackendSubscriber = async () => false;
     const isAuth = await adapter.isAuthorizedSender('111111111111');
     assert.equal(isAuth, false, 'Unregistered number must be unauthorized');
   });
 
-  it('rejects numbers shorter than 7 digits', async () => {
+  it('rejects numbers shorter than 7 digits without calling backend', async () => {
+    let backendCalled = false;
+    adapter.checkBackendSubscriber = async () => { backendCalled = true; return true; };
     const isAuth = await adapter.isAuthorizedSender('12345');
-    assert.equal(isAuth, false, 'Invalid short number must be unauthorized');
+    assert.equal(isAuth, false);
+    assert.equal(backendCalled, false, 'Should not query backend for short numbers');
   });
 
   it('fails closed on network or backend errors', async () => {
-    // Overwrite apiUrl temporarily to bad host
-    const originalApi = adapter.CONFIG.apiUrl;
-    const isAuth = await adapter.isAuthorizedSender('0000000000');
-    assert.equal(isAuth, false);
+    adapter.checkBackendSubscriber = async () => { throw new Error('Network timeout'); };
+    const isAuth = await adapter.isAuthorizedSender('919042099020');
+    assert.equal(isAuth, false, 'Must fail closed on error');
   });
 });
 
@@ -184,7 +160,6 @@ describe('checkRateLimit', () => {
     for (let i = 0; i < 5; i++) {
       adapter.checkRateLimit(phone1);
     }
-    // Phone1 is rate-limited but phone2 should still be allowed
     assert.equal(adapter.checkRateLimit(phone1), false);
     assert.ok(adapter.checkRateLimit(phone2));
   });
@@ -194,9 +169,26 @@ describe('checkRateLimit', () => {
 // Test: handleMessage — Authorization filtering
 // ---------------------------------------------------------------------------
 describe('handleMessage — authorization', () => {
-  beforeEach(() => { adapter.rateLimitWindows.clear(); });
+  const originalCheck = adapter.checkBackendSubscriber;
+  const originalChat = adapter.callWeatherGPTChat;
+
+  beforeEach(() => {
+    adapter.rateLimitWindows.clear();
+    adapter.checkBackendSubscriber = async (phone) => phone === '919042099020';
+    adapter.callWeatherGPTChat = async (sessionId, userMessage) => {
+      return `WeatherGPT response for "${userMessage}" in session ${sessionId}`;
+    };
+  });
+
+  afterEach(() => {
+    adapter.checkBackendSubscriber = originalCheck;
+    adapter.callWeatherGPTChat = originalChat;
+  });
 
   it('ignores messages from unauthorized senders (no reply sent, no API call)', async () => {
+    let chatCalled = false;
+    adapter.callWeatherGPTChat = async () => { chatCalled = true; return 'Reply'; };
+
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -210,10 +202,10 @@ describe('handleMessage — authorization', () => {
 
     await adapter.handleMessage(mockSocket, msg);
     assert.equal(sentMessages.length, 0, 'Unauthorized sender should get no reply');
+    assert.equal(chatCalled, false, 'Unauthorized sender must NOT trigger /api/chat');
   });
 
   it('forwards casual/conversational message "Where are you?" to /api/chat for authorized sender', async () => {
-    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -227,11 +219,10 @@ describe('handleMessage — authorization', () => {
 
     await adapter.handleMessage(mockSocket, msg);
     assert.equal(sentMessages.length, 1);
-    assert.ok(sentMessages[0].content.text.length > 0);
+    assert.ok(sentMessages[0].content.text.includes('Where are you?'));
   });
 
   it('forwards greeting "Hello" to /api/chat for authorized sender', async () => {
-    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -245,10 +236,10 @@ describe('handleMessage — authorization', () => {
 
     await adapter.handleMessage(mockSocket, msg);
     assert.equal(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.text.includes('Hello'));
   });
 
   it('forwards weather query "What is the weather in Chennai?" to /api/chat for authorized sender', async () => {
-    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -262,6 +253,7 @@ describe('handleMessage — authorization', () => {
 
     await adapter.handleMessage(mockSocket, msg);
     assert.equal(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.text.includes('What is the weather in Chennai?'));
   });
 });
 
@@ -348,10 +340,18 @@ describe('handleMessage — non-text messages', () => {
 // Test: handleMessage — Message length rejection (NOT truncation)
 // ---------------------------------------------------------------------------
 describe('handleMessage — message length rejection', () => {
-  beforeEach(() => { adapter.rateLimitWindows.clear(); });
+  const originalCheck = adapter.checkBackendSubscriber;
+
+  beforeEach(() => {
+    adapter.rateLimitWindows.clear();
+    adapter.checkBackendSubscriber = async (phone) => phone === '919042099020';
+  });
+
+  afterEach(() => {
+    adapter.checkBackendSubscriber = originalCheck;
+  });
 
   it('rejects oversized messages with a controlled reply', async () => {
-    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -373,7 +373,10 @@ describe('handleMessage — message length rejection', () => {
   });
 
   it('does NOT call /api/chat for oversized messages', async () => {
-    await registerTestSubscriber('+919042099020');
+    let chatCalled = false;
+    const originalChat = adapter.callWeatherGPTChat;
+    adapter.callWeatherGPTChat = async () => { chatCalled = true; return 'Reply'; };
+
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -388,6 +391,8 @@ describe('handleMessage — message length rejection', () => {
 
     await adapter.handleMessage(mockSocket, msg);
     assert.equal(sentMessages.length, 1);
+    assert.equal(chatCalled, false, 'Chat API must NOT be called for oversized message');
+    adapter.callWeatherGPTChat = originalChat;
   });
 });
 
@@ -395,10 +400,18 @@ describe('handleMessage — message length rejection', () => {
 // Test: handleMessage — Rate limiting
 // ---------------------------------------------------------------------------
 describe('handleMessage — rate limiting', () => {
-  beforeEach(() => { adapter.rateLimitWindows.clear(); });
+  const originalCheck = adapter.checkBackendSubscriber;
+
+  beforeEach(() => {
+    adapter.rateLimitWindows.clear();
+    adapter.checkBackendSubscriber = async (phone) => phone === '919042099020';
+  });
+
+  afterEach(() => {
+    adapter.checkBackendSubscriber = originalCheck;
+  });
 
   it('rate-limits sender after exceeding per-minute limit', async () => {
-    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }

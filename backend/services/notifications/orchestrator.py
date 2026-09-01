@@ -25,6 +25,7 @@ from backend.services.notifications.twilio_sms import twilio_sms_adapter
 from backend.services.notifications.twilio_voice import twilio_voice_adapter
 from backend.services.notifications.twilio_whatsapp import twilio_whatsapp_adapter
 from backend.services.notifications.web_push import web_push_adapter
+from fastapi import HTTPException, status
 from backend.services.notifications.formatter import (
     format_whatsapp_alert,
     format_sms_alert,
@@ -35,118 +36,94 @@ from backend.db.supabase import supabase_client
 class NotificationOrchestrator:
     """
     Central Notification Orchestrator.
-    Handles user subscriptions with persistent Supabase backend, severity & geographic filtering,
-    rate limiting, idempotency enforcement, multilingual template selection, and fault-tolerant multi-channel dispatch.
+    Handles user subscriptions with Supabase as the sole authoritative persistent database,
+    severity & geographic filtering, rate limiting, idempotency enforcement,
+    multilingual template selection, and fault-tolerant multi-channel dispatch.
     """
     def __init__(self):
-        self._subscriptions: Dict[str, NotificationSubscription] = {}
         self._sent_idempotency_keys: Dict[str, float] = {} # idempotency_key -> timestamp
         self._recipient_hourly_counts: Dict[str, List[float]] = {} # recipient -> list of timestamps
         self._audit_records: List[NotificationRecord] = []
         self._lock = asyncio.Lock()
 
     async def save_subscription(self, req: SubscriptionRequest) -> NotificationSubscription:
-        """Saves or updates user notification preferences with explicit opt-in in Supabase and local cache."""
-        async with self._lock:
-            sub_id = str(uuid.uuid4())
-            existing = self._subscriptions.get(req.user_identifier)
+        """
+        Saves or updates user notification preferences in Supabase as the sole authoritative source of truth.
+        Raises HTTPException(503) if Supabase write fails or is unconfigured.
+        """
+        sub_id = str(uuid.uuid4())
+        existing = None
+        if supabase_client.is_configured():
+            existing = await supabase_client.get_subscription(req.user_identifier)
             if existing:
                 sub_id = existing.subscription_id
 
-            sub = NotificationSubscription(
-                subscription_id=sub_id,
-                user_identifier=req.user_identifier,
-                phone_number=req.phone_number,
-                whatsapp_number=req.whatsapp_number or req.phone_number,
-                preferred_language=req.preferred_language,
-                enabled_channels=req.enabled_channels,
-                min_severity_threshold=req.min_severity_threshold,
-                target_states=req.target_states,
-                target_districts=req.target_districts,
-                push_subscription=req.push_subscription,
-                is_opted_in=req.is_opted_in,
-                created_at=existing.created_at if existing else datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-            self._subscriptions[req.user_identifier] = sub
-            
-            # Persist to Supabase if configured
-            if supabase_client.is_configured():
-                await supabase_client.save_subscription(sub)
+        sub = NotificationSubscription(
+            subscription_id=sub_id,
+            user_identifier=req.user_identifier,
+            phone_number=req.phone_number,
+            whatsapp_number=req.whatsapp_number or req.phone_number,
+            preferred_language=req.preferred_language,
+            enabled_channels=req.enabled_channels,
+            min_severity_threshold=req.min_severity_threshold,
+            target_states=req.target_states,
+            target_districts=req.target_districts,
+            push_subscription=req.push_subscription,
+            is_opted_in=req.is_opted_in,
+            created_at=existing.created_at if existing else datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
 
-            logger.info(f"Notification subscription updated for user: {req.user_identifier} (Channels: {req.enabled_channels})")
-            return sub
+        if not supabase_client.is_configured():
+            logger.error("Supabase is not configured; cannot persist subscription.")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database persistence error: Supabase is not configured."
+            )
+
+        success = await supabase_client.save_subscription(sub)
+        if not success:
+            logger.error(f"Failed to persist subscription to Supabase for user: {req.user_identifier}")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to persist subscription to database. Please try again."
+            )
+
+        logger.info(f"Notification subscription persisted in Supabase for user: {req.user_identifier} (Channels: {req.enabled_channels})")
+        return sub
 
     async def get_subscription(self, user_identifier: str) -> Optional[NotificationSubscription]:
-        """Retrieves subscription from Supabase or local fallback cache."""
-        if supabase_client.is_configured():
-            remote_sub = await supabase_client.get_subscription(user_identifier)
-            if remote_sub:
-                async with self._lock:
-                    self._subscriptions[user_identifier] = remote_sub
-                return remote_sub
-
-        async with self._lock:
-            return self._subscriptions.get(user_identifier)
+        """Retrieves subscription directly from Supabase (sole authoritative source of truth)."""
+        if not supabase_client.is_configured():
+            return None
+        return await supabase_client.get_subscription(user_identifier)
 
     async def delete_subscription(self, user_identifier: str) -> bool:
-        """Deactivates/deletes user subscription in Supabase and local cache."""
-        if supabase_client.is_configured():
-            await supabase_client.delete_subscription(user_identifier)
-
-        async with self._lock:
-            if user_identifier in self._subscriptions:
-                del self._subscriptions[user_identifier]
-                logger.info(f"Unsubscribed user: {user_identifier}")
-                return True
+        """Deactivates/deletes user subscription directly in Supabase."""
+        if not supabase_client.is_configured():
             return False
+        return await supabase_client.delete_subscription(user_identifier)
 
     async def is_phone_subscribed(self, phone: str) -> bool:
         """
-        Checks whether a normalized phone number belongs to an active, opted-in Emergency Alert subscriber.
-        Used as the authoritative authorization source for the WhatsApp chatbot sidecar.
-        Queries Supabase live if configured; falls back to memory cache if Supabase is offline/unconfigured.
+        Checks whether a normalized phone number belongs to an active, opted-in Emergency Alert subscriber
+        directly against Supabase (sole authoritative source of truth).
         """
-        clean_target = "".join(c for c in phone if c.isdigit())
-        if not clean_target:
+        if not supabase_client.is_configured():
             return False
-
-        # 1. Authoritative: Live Supabase query
-        if supabase_client.is_configured():
-            is_sub = await supabase_client.is_phone_subscribed(phone)
-            if is_sub is not None:
-                return is_sub
-
-        # 2. Local fallback store (for local/offline test runners)
-        async with self._lock:
-            for sub in self._subscriptions.values():
-                if not sub.is_opted_in:
-                    continue
-                
-                # Check all phone fields associated with the subscription
-                candidate_phones = [sub.phone_number, sub.whatsapp_number, sub.user_identifier]
-                for cp in candidate_phones:
-                    if not cp:
-                        continue
-                    clean_cp = "".join(c for c in cp if c.isdigit())
-                    if not clean_cp:
-                        continue
-                    # Match exact digits or last 10 digits (handling country code prefixes like +91 / 91)
-                    if clean_cp == clean_target:
-                        return True
-                    if len(clean_cp) >= 10 and len(clean_target) >= 10 and clean_cp[-10:] == clean_target[-10:]:
-                        return True
-        return False
+        return await supabase_client.is_phone_subscribed(phone)
 
     async def handle_alert_event(self, event: DisasterAlertTriggeredEvent) -> List[NotificationRecord]:
         """
         Orchestrates concurrent, fault-isolated multi-channel delivery when an official disaster alert occurs.
+        Reads active subscribers directly from Supabase.
         """
         alert = event.alert
         logger.info(f"Orchestrator processing alert: {alert.alert_id} ({alert.title}) - {alert.severity.value}")
 
-        async with self._lock:
-            all_subs = list(self._subscriptions.values())
+        all_subs = []
+        if supabase_client.is_configured():
+            all_subs = await supabase_client.get_all_active_subscriptions()
 
         tasks = []
         for sub in all_subs:
