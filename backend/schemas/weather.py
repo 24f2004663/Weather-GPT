@@ -76,4 +76,6 @@ class NormalizedWeatherResponse(BaseModel):
     timezone: str = "UTC"
     elevation_m: Optional[float] = None
     cached: bool = False
+    stale: bool = False  # True when served from stale cache after upstream failure
     retrieved_at: datetime = Field(default_factory=datetime.utcnow)
+

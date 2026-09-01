@@ -29,10 +29,12 @@ class Settings(BaseSettings):
     HTTP_MAX_RETRIES: int = Field(default=2, env="HTTP_MAX_RETRIES")
 
     # Cache TTLs (in seconds)
-    WEATHER_CACHE_TTL_SECONDS: int = Field(default=900, env="WEATHER_CACHE_TTL_SECONDS")       # 15 mins
+    WEATHER_CACHE_TTL_SECONDS: int = Field(default=900, env="WEATHER_CACHE_TTL_SECONDS")       # 15 mins (fresh)
+    WEATHER_STALE_CACHE_TTL_SECONDS: int = Field(default=7200, env="WEATHER_STALE_CACHE_TTL_SECONDS") # 2 hours (stale fallback)
     GEOCODING_CACHE_TTL_SECONDS: int = Field(default=86400, env="GEOCODING_CACHE_TTL_SECONDS")   # 24 hours
     CLIMATE_CACHE_TTL_SECONDS: int = Field(default=604800, env="CLIMATE_CACHE_TTL_SECONDS")    # 7 days
     ALERT_CACHE_TTL_SECONDS: int = Field(default=300, env="ALERT_CACHE_TTL_SECONDS")          # 5 mins
+
 
     # Weather & Feed URLs
     OPEN_METEO_BASE_URL: str = Field(default="https://api.open-meteo.com/v1", env="OPEN_METEO_BASE_URL")
