@@ -289,26 +289,20 @@ function checkBackendSubscriber(phone) {
 
 /**
  * Authoritative sender authorization function.
- * Primary source: Emergency Alert subscription registry.
- * Secondary source: Optional WHATSAPP_ALLOWED_NUMBERS dev override (if configured).
+ * Evaluates live against the backend Emergency Alert subscriber registry (persisted in Supabase).
+ * Performs a fresh query on EVERY incoming message without in-memory caching.
+ * Fails closed on network or backend errors.
  */
 async function isAuthorizedSender(phone) {
   if (!phone || phone.length < 7) return false;
 
-  // 1. Authoritative: Emergency Alert subscriber registry
   try {
     const isSubscribed = await checkBackendSubscriber(phone);
-    if (isSubscribed) return true;
+    return Boolean(isSubscribed);
   } catch (err) {
     log('error', { reason: 'subscriber_check_failed', error: err.message, phone_suffix: phone.slice(-4) });
+    return false; // Fail closed
   }
-
-  // 2. Local dev override fallback
-  if (CONFIG.allowedNumbers.size > 0 && CONFIG.allowedNumbers.has(phone)) {
-    return true;
-  }
-
-  return false;
 }
 
 // ---------------------------------------------------------------------------

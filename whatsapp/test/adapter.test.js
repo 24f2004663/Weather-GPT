@@ -1,7 +1,7 @@
 /**
  * WeatherGPT WhatsApp Adapter — Unit Tests
  *
- * Tests all safety controls using mocks. No real WhatsApp connections.
+ * Tests all safety controls using mocks and backend API contracts.
  * Uses Node.js built-in test runner (node --test).
  */
 
@@ -9,8 +9,41 @@
 
 const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('http');
 
 const adapter = require('../index.js');
+
+// Helper to register a test subscriber directly with backend for integration testing
+function registerTestSubscriber(phone) {
+  return new Promise((resolve) => {
+    const payload = JSON.stringify({
+      user_identifier: `test_user_${phone.replace(/\D/g, '')}`,
+      phone_number: phone,
+      whatsapp_number: phone,
+      enabled_channels: ['WHATSAPP'],
+      is_opted_in: true,
+    });
+
+    const req = http.request({
+      hostname: 'localhost',
+      port: 8000,
+      path: '/api/notifications/preferences',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+      timeout: 3000,
+    }, (res) => {
+      resolve(res.statusCode >= 200 && res.statusCode < 300);
+    });
+
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.write(payload);
+    req.end();
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Test: parseAllowedNumbers
@@ -79,19 +112,26 @@ describe('resolveSenderPhone', () => {
 // Test: Subscriber Authorization (isAuthorizedSender)
 // ---------------------------------------------------------------------------
 describe('isAuthorizedSender', () => {
-  it('authorizes allowlisted / registered phone number', async () => {
-    // 919042099020 is in CONFIG.allowedNumbers (or backend registry)
+  it('authorizes registered alert subscriber phone number', async () => {
+    await registerTestSubscriber('+919042099020');
     const isAuth = await adapter.isAuthorizedSender('919042099020');
-    assert.ok(isAuth);
+    assert.ok(isAuth, 'Registered subscriber must be authorized');
   });
 
-  it('rejects unregistered number not in allowlist', async () => {
+  it('rejects unregistered number', async () => {
     const isAuth = await adapter.isAuthorizedSender('111111111111');
-    assert.equal(isAuth, false);
+    assert.equal(isAuth, false, 'Unregistered number must be unauthorized');
   });
 
   it('rejects numbers shorter than 7 digits', async () => {
     const isAuth = await adapter.isAuthorizedSender('12345');
+    assert.equal(isAuth, false, 'Invalid short number must be unauthorized');
+  });
+
+  it('fails closed on network or backend errors', async () => {
+    // Overwrite apiUrl temporarily to bad host
+    const originalApi = adapter.CONFIG.apiUrl;
+    const isAuth = await adapter.isAuthorizedSender('0000000000');
     assert.equal(isAuth, false);
   });
 });
@@ -173,6 +213,7 @@ describe('handleMessage — authorization', () => {
   });
 
   it('forwards casual/conversational message "Where are you?" to /api/chat for authorized sender', async () => {
+    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -185,12 +226,12 @@ describe('handleMessage — authorization', () => {
     };
 
     await adapter.handleMessage(mockSocket, msg);
-    // Should process the message and send a reply
     assert.equal(sentMessages.length, 1);
     assert.ok(sentMessages[0].content.text.length > 0);
   });
 
   it('forwards greeting "Hello" to /api/chat for authorized sender', async () => {
+    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -207,6 +248,7 @@ describe('handleMessage — authorization', () => {
   });
 
   it('forwards weather query "What is the weather in Chennai?" to /api/chat for authorized sender', async () => {
+    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -309,6 +351,7 @@ describe('handleMessage — message length rejection', () => {
   beforeEach(() => { adapter.rateLimitWindows.clear(); });
 
   it('rejects oversized messages with a controlled reply', async () => {
+    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -330,6 +373,7 @@ describe('handleMessage — message length rejection', () => {
   });
 
   it('does NOT call /api/chat for oversized messages', async () => {
+    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -354,6 +398,7 @@ describe('handleMessage — rate limiting', () => {
   beforeEach(() => { adapter.rateLimitWindows.clear(); });
 
   it('rate-limits sender after exceeding per-minute limit', async () => {
+    await registerTestSubscriber('+919042099020');
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }

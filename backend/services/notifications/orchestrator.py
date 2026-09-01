@@ -30,12 +30,13 @@ from backend.services.notifications.formatter import (
     format_sms_alert,
     format_voice_script,
 )
+from backend.db.supabase import supabase_client
 
 class NotificationOrchestrator:
     """
     Central Notification Orchestrator.
-    Handles user subscriptions, severity & geographic filtering, rate limiting,
-    idempotency enforcement, multilingual template selection, and fault-tolerant multi-channel dispatch.
+    Handles user subscriptions with persistent Supabase backend, severity & geographic filtering,
+    rate limiting, idempotency enforcement, multilingual template selection, and fault-tolerant multi-channel dispatch.
     """
     def __init__(self):
         self._subscriptions: Dict[str, NotificationSubscription] = {}
@@ -45,7 +46,7 @@ class NotificationOrchestrator:
         self._lock = asyncio.Lock()
 
     async def save_subscription(self, req: SubscriptionRequest) -> NotificationSubscription:
-        """Saves or updates user notification preferences with explicit opt-in."""
+        """Saves or updates user notification preferences with explicit opt-in in Supabase and local cache."""
         async with self._lock:
             sub_id = str(uuid.uuid4())
             existing = self._subscriptions.get(req.user_identifier)
@@ -68,14 +69,31 @@ class NotificationOrchestrator:
                 updated_at=datetime.utcnow()
             )
             self._subscriptions[req.user_identifier] = sub
+            
+            # Persist to Supabase if configured
+            if supabase_client.is_configured():
+                await supabase_client.save_subscription(sub)
+
             logger.info(f"Notification subscription updated for user: {req.user_identifier} (Channels: {req.enabled_channels})")
             return sub
 
     async def get_subscription(self, user_identifier: str) -> Optional[NotificationSubscription]:
+        """Retrieves subscription from Supabase or local fallback cache."""
+        if supabase_client.is_configured():
+            remote_sub = await supabase_client.get_subscription(user_identifier)
+            if remote_sub:
+                async with self._lock:
+                    self._subscriptions[user_identifier] = remote_sub
+                return remote_sub
+
         async with self._lock:
             return self._subscriptions.get(user_identifier)
 
     async def delete_subscription(self, user_identifier: str) -> bool:
+        """Deactivates/deletes user subscription in Supabase and local cache."""
+        if supabase_client.is_configured():
+            await supabase_client.delete_subscription(user_identifier)
+
         async with self._lock:
             if user_identifier in self._subscriptions:
                 del self._subscriptions[user_identifier]
@@ -87,11 +105,19 @@ class NotificationOrchestrator:
         """
         Checks whether a normalized phone number belongs to an active, opted-in Emergency Alert subscriber.
         Used as the authoritative authorization source for the WhatsApp chatbot sidecar.
+        Queries Supabase live if configured; falls back to memory cache if Supabase is offline/unconfigured.
         """
         clean_target = "".join(c for c in phone if c.isdigit())
         if not clean_target:
             return False
 
+        # 1. Authoritative: Live Supabase query
+        if supabase_client.is_configured():
+            is_sub = await supabase_client.is_phone_subscribed(phone)
+            if is_sub is not None:
+                return is_sub
+
+        # 2. Local fallback store (for local/offline test runners)
         async with self._lock:
             for sub in self._subscriptions.values():
                 if not sub.is_opted_in:

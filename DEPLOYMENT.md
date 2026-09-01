@@ -106,7 +106,24 @@ After the Render backend is deployed, configure Twilio to route incoming WhatsAp
 
 ---
 
-## 5. Security & Repository Hygiene Rules
+## 5. WhatsApp Chatbot Sidecar & Supabase Authorization
+
+WeatherGPT includes a standalone Baileys WhatsApp adapter sidecar located in [`whatsapp/`](file:///c:/Users/Kmano/Dropbox/Projects/CurrentProject/whatsapp/).
+
+> [!IMPORTANT]
+> **Emergency Alert subscription status stored in Supabase is the authoritative WhatsApp chatbot access control.**
+
+### Architectural Rules
+1. **Live Supabase Verification**: Sender authorization is checked on **every incoming WhatsApp message** via `GET /api/notifications/subscriber/verify?phone=<phone>`.
+2. **Zero In-Memory Allowlist Dependency**: No local or static allowlist is required for production authorization.
+3. **Persistent Registration**: Frontend registration via Emergency Alert Preferences writes directly to the persistent Supabase `alert_subscriptions` table.
+4. **Immediate Revocation**: Unsubscribing immediately deactivates the user's subscription in Supabase and revokes WhatsApp access without requiring any process restart.
+5. **Quota Protection**: Unauthorized senders are rejected silently at the adapter level — they **never reach `/api/chat`** and consume **zero Gemini quota**.
+6. **Privacy LID Compatibility**: WhatsApp privacy `@lid` JIDs are resolved automatically to real phone numbers using Baileys reverse LID mapping before checking Supabase.
+
+---
+
+## 6. Security & Repository Hygiene Rules
 
 - **Zero Secrets in Git**: All `.env` and credential files are strictly excluded via `.gitignore`.
 - **Environment Example Files**: Safe templates with placeholder values are available at [`.env.example`](file:///c:/Users/Kmano/Dropbox/Projects/CurrentProject/.env.example), [`backend/.env.example`](file:///c:/Users/Kmano/Dropbox/Projects/CurrentProject/backend/.env.example), and [`frontend/.env.example`](file:///c:/Users/Kmano/Dropbox/Projects/CurrentProject/frontend/.env.example).

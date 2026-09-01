@@ -482,3 +482,79 @@ class TestNotificationServices(unittest.TestCase):
         res4 = self.client.get("/api/notifications/subscriber/verify?phone=911111111111")
         self.assertEqual(res4.status_code, 200)
         self.assertFalse(res4.json()["is_subscribed"])
+
+    # 18. Unsubscribe Revokes Access Immediately
+    def test_unsubscribe_immediately_revokes_whatsapp_authorization(self):
+        user_id = "temp_whatsapp_user"
+        phone = "+919876543210"
+
+        # 1. Subscribe
+        asyncio.run(notification_orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier=user_id,
+            phone_number=phone,
+            whatsapp_number=phone,
+            enabled_channels=[NotificationChannel.WHATSAPP],
+            is_opted_in=True
+        )))
+
+        # Verify active
+        res1 = self.client.get(f"/api/notifications/subscriber/verify?phone={phone}")
+        self.assertTrue(res1.json()["is_subscribed"])
+
+        # 2. Unsubscribe via DELETE
+        del_res = self.client.delete(f"/api/notifications/preferences?user_id={user_id}")
+        self.assertEqual(del_res.status_code, 200)
+
+        # 3. Immediately verify unauthorized (no process restart needed)
+        res2 = self.client.get(f"/api/notifications/subscriber/verify?phone={phone}")
+        self.assertFalse(res2.json()["is_subscribed"])
+
+    # 19. Supabase REST Client Unit Tests (Mocked PostgREST)
+    @patch("httpx.AsyncClient.post")
+    def test_supabase_save_subscription_mock(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_post.return_value = mock_resp
+
+        from backend.db.supabase import SupabaseClient
+        client = SupabaseClient()
+        client.url = "https://mock.supabase.co"
+        client.key = "mock_key"
+        client.has_credentials = True
+
+        sub = NotificationSubscription(
+            subscription_id="test-uuid",
+            user_identifier="mock_user",
+            phone_number="+919042099020",
+            whatsapp_number="+919042099020",
+            enabled_channels=[NotificationChannel.WHATSAPP],
+            is_opted_in=True
+        )
+
+        res = asyncio.run(client.save_subscription(sub))
+        self.assertTrue(res)
+        mock_post.assert_called_once()
+
+    @patch("httpx.AsyncClient.get")
+    def test_supabase_is_phone_subscribed_mock(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = [
+            {"user_identifier": "mock_u", "phone_number": "+919042099020", "whatsapp_number": "+919042099020", "is_opted_in": True}
+        ]
+        mock_get.return_value = mock_resp
+
+        from backend.db.supabase import SupabaseClient
+        client = SupabaseClient()
+        client.url = "https://mock.supabase.co"
+        client.key = "mock_key"
+        client.has_credentials = True
+
+        # Authorized phone
+        res = asyncio.run(client.is_phone_subscribed("+919042099020"))
+        self.assertTrue(res)
+
+        # Unauthorized phone
+        mock_resp.json.return_value = []
+        res2 = asyncio.run(client.is_phone_subscribed("+911234567890"))
+        self.assertFalse(res2)
