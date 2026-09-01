@@ -43,9 +43,38 @@ class Settings(BaseSettings):
     NASA_POWER_BASE_URL: str = Field(default="https://power.larc.nasa.gov/api/temporal/climatology/point", env="NASA_POWER_BASE_URL")
     SACHET_NDMA_ALERT_FEED_URL: str = Field(default="https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml", env="SACHET_NDMA_ALERT_FEED_URL")
 
-    # Primary LLM Provider
+    # Primary LLM Provider & Multi-Model Quota Router
     GEMINI_API_KEY: Optional[str] = Field(default=None, env="GEMINI_API_KEY")
-    GEMINI_MODEL: str = Field(default="gemini-3.5-flash", env="GEMINI_MODEL")
+    GEMINI_MODEL: str = Field(default="gemini-3.5-flash-lite", env="GEMINI_MODEL")
+
+    # Priority Model 1: Gemini 3.5 Flash Lite (Application-level protective limits)
+    GEMINI_MODEL_1: str = Field(default="gemini-3.5-flash-lite", env="GEMINI_MODEL_1")
+    GEMINI_FLASH_LITE_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_SAFE_RPM")
+    GEMINI_FLASH_LITE_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_SAFE_RPD")
+    GEMINI_FLASH_LITE_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_SAFE_TPM")
+
+    # Priority Model 2: Gemini 3.1 Flash Lite (Application-level protective limits)
+    GEMINI_MODEL_2: str = Field(default="gemini-3.1-flash-lite", env="GEMINI_MODEL_2")
+    GEMINI_FLASH_LITE_31B_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_31B_SAFE_RPM")
+    GEMINI_FLASH_LITE_31B_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_31B_SAFE_RPD")
+    GEMINI_FLASH_LITE_31B_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_31B_SAFE_TPM")
+
+    # Priority Model 3: Gemma 4 31B (Application-level protective limits)
+    GEMINI_MODEL_3: str = Field(default="gemma-4-31b", env="GEMINI_MODEL_3")
+    GEMMA_4_31B_SAFE_RPM: int = Field(default=25, env="GEMMA_4_31B_SAFE_RPM")
+    GEMMA_4_31B_SAFE_RPD: int = Field(default=1000, env="GEMMA_4_31B_SAFE_RPD")
+    GEMMA_4_31B_SAFE_TPM: int = Field(default=250000, env="GEMMA_4_31B_SAFE_TPM")
+
+    # Priority Model 4: Gemma 4 26B (Application-level protective limits)
+    GEMINI_MODEL_4: str = Field(default="gemma-4-26b", env="GEMINI_MODEL_4")
+    GEMMA_4_26B_SAFE_RPM: int = Field(default=25, env="GEMMA_4_26B_SAFE_RPM")
+    GEMMA_4_26B_SAFE_RPD: int = Field(default=1000, env="GEMMA_4_26B_SAFE_RPD")
+    GEMMA_4_26B_SAFE_TPM: int = Field(default=250000, env="GEMMA_4_26B_SAFE_TPM")
+
+    # Quota Suppression Duration on 429
+    GEMINI_429_SUPPRESS_SECONDS: int = Field(default=60, env="GEMINI_429_SUPPRESS_SECONDS")
+
+
 
     # Supabase / Database
     SUPABASE_URL: Optional[str] = Field(default=None, env="SUPABASE_URL")
