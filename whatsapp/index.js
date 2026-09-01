@@ -9,7 +9,7 @@
  *
  * Safety controls:
  *   - Disabled by default (WHATSAPP_BOT_ENABLED=false)
- *   - Explicit sender allowlist
+ *   - Explicit sender allowlist (supports both standard phone JIDs and WhatsApp privacy LIDs)
  *   - Groups, broadcasts, status, own messages, non-text all ignored
  *   - Per-sender rate limiting (sliding window)
  *   - Message length rejection (not truncation)
@@ -59,6 +59,58 @@ function parseAllowedNumbers(raw) {
  */
 function jidToPhone(jid) {
   if (!jid) return '';
+  return jid.split('@')[0].replace(/\D/g, '');
+}
+
+/**
+ * Resolves the actual sender phone number from JID, metadata, or auth LID mapping.
+ * WhatsApp often delivers messages via privacy LIDs (@lid), e.g. "231331770445968@lid".
+ */
+async function resolveSenderPhone(socket, jid, msg) {
+  if (!jid) return '';
+
+  // 1. Direct phone JID: "919940148758@s.whatsapp.net" -> "919940148758"
+  if (jid.endsWith('@s.whatsapp.net')) {
+    return jid.split('@')[0].replace(/\D/g, '');
+  }
+
+  // 2. LID JID: e.g. "231331770445968@lid"
+  if (jid.endsWith('@lid')) {
+    const lidDigits = jid.split('@')[0].replace(/\D/g, '');
+
+    // Check message metadata for alternate phone JID
+    if (msg?.key?.remoteJidAlt && msg.key.remoteJidAlt.endsWith('@s.whatsapp.net')) {
+      return msg.key.remoteJidAlt.split('@')[0].replace(/\D/g, '');
+    }
+    if (msg?.key?.participantPn && msg.key.participantPn.endsWith('@s.whatsapp.net')) {
+      return msg.key.participantPn.split('@')[0].replace(/\D/g, '');
+    }
+
+    // Check Baileys signalRepository if available
+    try {
+      if (socket?.signalRepository?.lidToJid) {
+        const mappedJid = await socket.signalRepository.lidToJid(jid);
+        if (mappedJid && mappedJid.endsWith('@s.whatsapp.net')) {
+          return mappedJid.split('@')[0].replace(/\D/g, '');
+        }
+      }
+    } catch (_) {}
+
+    // Check auth folder reverse mapping file: lid-mapping-<lidDigits>_reverse.json
+    try {
+      const reverseMapFile = path.join(CONFIG.authDir, `lid-mapping-${lidDigits}_reverse.json`);
+      if (fs.existsSync(reverseMapFile)) {
+        const rawContent = fs.readFileSync(reverseMapFile, 'utf8');
+        const phone = JSON.parse(rawContent);
+        if (phone && typeof phone === 'string') {
+          return phone.replace(/\D/g, '');
+        }
+      }
+    } catch (_) {}
+
+    return lidDigits;
+  }
+
   return jid.split('@')[0].replace(/\D/g, '');
 }
 
@@ -232,9 +284,10 @@ async function handleMessage(socket, msg) {
     return;
   }
 
-  const phone = jidToPhone(jid);
+  // 4. Resolve sender phone number (handles both @s.whatsapp.net and privacy @lid)
+  const phone = await resolveSenderPhone(socket, jid, msg);
 
-  // 4. Allowlist check
+  // 5. Allowlist check
   if (!CONFIG.allowedNumbers.has(phone)) {
     log('ignored', { reason: 'not_allowlisted', phone_suffix: phone.slice(-4) });
     return;
@@ -242,7 +295,7 @@ async function handleMessage(socket, msg) {
 
   log('received', { phone_suffix: phone.slice(-4), message_length: text.length });
 
-  // 5. Message length check — reject, do NOT truncate
+  // 6. Message length check — reject, do NOT truncate
   if (text.length > CONFIG.maxMessageLen) {
     log('ignored', { reason: 'message_too_long', length: text.length, limit: CONFIG.maxMessageLen });
     try {
@@ -256,7 +309,7 @@ async function handleMessage(socket, msg) {
     return;
   }
 
-  // 6. Rate limit check
+  // 7. Rate limit check
   if (!checkRateLimit(phone)) {
     log('ignored', { reason: 'rate_limited', phone_suffix: phone.slice(-4), limit: CONFIG.rateLimitPerMin });
     try {
@@ -267,7 +320,7 @@ async function handleMessage(socket, msg) {
     return;
   }
 
-  // 7. Call /api/chat
+  // 8. Call /api/chat
   const sessionId = phoneToSessionId(phone);
   log('chat_request', { phone_suffix: phone.slice(-4), session_id: sessionId });
 
@@ -275,7 +328,7 @@ async function handleMessage(socket, msg) {
     const response = await callWeatherGPTChat(text.trim(), sessionId);
     log('chat_response', { phone_suffix: phone.slice(-4), response_length: response.length });
 
-    // 8. Send response back via WhatsApp
+    // 9. Send response back via WhatsApp
     await socket.sendMessage(jid, { text: response });
     log('send', { type: 'chat_response', phone_suffix: phone.slice(-4) });
 
@@ -389,6 +442,7 @@ module.exports = {
   CONFIG,
   parseAllowedNumbers,
   jidToPhone,
+  resolveSenderPhone,
   phoneToSessionId,
   checkRateLimit,
   callWeatherGPTChat,
@@ -429,4 +483,3 @@ if (require.main === module) {
     process.exit(0);
   });
 }
-
