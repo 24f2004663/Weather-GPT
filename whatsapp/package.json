@@ -1,0 +1,19 @@
+{
+  "name": "weathergpt-whatsapp",
+  "version": "1.0.0",
+  "description": "WeatherGPT WhatsApp Baileys Adapter — sidecar process bridging WhatsApp to /api/chat",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test test/"
+  },
+  "keywords": ["weathergpt", "whatsapp", "baileys"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "dotenv": "^16.4.5",
+    "pino": "^10.3.1",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

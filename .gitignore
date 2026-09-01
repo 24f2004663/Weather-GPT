@@ -70,6 +70,11 @@ Thumbs.db
 .tempmediaStorage/
 .system_generated/
 
+# WhatsApp Baileys Sidecar (NEVER commit auth/session state)
+whatsapp/auth/
+whatsapp/node_modules/
+whatsapp/.env
+
 # Preserve Proof & Project Documentation
 !proof/
 !proof/**

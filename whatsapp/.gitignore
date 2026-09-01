@@ -1,0 +1,8 @@
+# Baileys authentication/session data (NEVER commit)
+auth/
+
+# Node dependencies
+node_modules/
+
+# Environment secrets
+.env
