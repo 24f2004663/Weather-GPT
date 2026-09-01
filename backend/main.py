@@ -378,6 +378,15 @@ async def unsubscribe_notifications(
     success = await notification_orchestrator.delete_subscription(user_identifier=user_id)
     return {"status": "unsubscribed" if success else "not_found", "user_identifier": user_id}
 
+@app.get("/api/notifications/subscriber/verify", tags=["Notifications"])
+async def verify_subscriber_phone(
+    response: FastAPIResponse,
+    phone: str = Query(..., min_length=7, max_length=30, description="Phone number to check subscription status for")
+):
+    response.headers["Cache-Control"] = "no-store, private"
+    is_active = await notification_orchestrator.is_phone_subscribed(phone)
+    return {"phone": phone, "is_subscribed": is_active}
+
 @app.get("/api/notifications/providers/status", response_model=ProviderStatusResponse, tags=["Notifications"])
 async def get_notification_providers_status(response: FastAPIResponse):
     response.headers["Cache-Control"] = "public, max-age=60"

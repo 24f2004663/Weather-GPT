@@ -76,6 +76,27 @@ describe('resolveSenderPhone', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test: Subscriber Authorization (isAuthorizedSender)
+// ---------------------------------------------------------------------------
+describe('isAuthorizedSender', () => {
+  it('authorizes allowlisted / registered phone number', async () => {
+    // 919042099020 is in CONFIG.allowedNumbers (or backend registry)
+    const isAuth = await adapter.isAuthorizedSender('919042099020');
+    assert.ok(isAuth);
+  });
+
+  it('rejects unregistered number not in allowlist', async () => {
+    const isAuth = await adapter.isAuthorizedSender('111111111111');
+    assert.equal(isAuth, false);
+  });
+
+  it('rejects numbers shorter than 7 digits', async () => {
+    const isAuth = await adapter.isAuthorizedSender('12345');
+    assert.equal(isAuth, false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test: phoneToSessionId
 // ---------------------------------------------------------------------------
 describe('phoneToSessionId', () => {
@@ -130,12 +151,12 @@ describe('checkRateLimit', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test: handleMessage — Allowlist filtering
+// Test: handleMessage — Authorization filtering
 // ---------------------------------------------------------------------------
-describe('handleMessage — allowlist', () => {
+describe('handleMessage — authorization', () => {
   beforeEach(() => { adapter.rateLimitWindows.clear(); });
 
-  it('ignores messages from non-allowlisted senders (no reply sent)', async () => {
+  it('ignores messages from unauthorized senders (no reply sent, no API call)', async () => {
     const sentMessages = [];
     const mockSocket = {
       sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
@@ -148,7 +169,57 @@ describe('handleMessage — allowlist', () => {
     };
 
     await adapter.handleMessage(mockSocket, msg);
-    assert.equal(sentMessages.length, 0, 'Non-allowlisted sender should get no reply');
+    assert.equal(sentMessages.length, 0, 'Unauthorized sender should get no reply');
+  });
+
+  it('forwards casual/conversational message "Where are you?" to /api/chat for authorized sender', async () => {
+    const sentMessages = [];
+    const mockSocket = {
+      sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
+    };
+
+    const msg = {
+      key: { fromMe: false, remoteJid: '919042099020@s.whatsapp.net' },
+      message: { conversation: 'Where are you?' },
+      messageTimestamp: Math.floor(Date.now() / 1000),
+    };
+
+    await adapter.handleMessage(mockSocket, msg);
+    // Should process the message and send a reply
+    assert.equal(sentMessages.length, 1);
+    assert.ok(sentMessages[0].content.text.length > 0);
+  });
+
+  it('forwards greeting "Hello" to /api/chat for authorized sender', async () => {
+    const sentMessages = [];
+    const mockSocket = {
+      sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
+    };
+
+    const msg = {
+      key: { fromMe: false, remoteJid: '919042099020@s.whatsapp.net' },
+      message: { conversation: 'Hello' },
+      messageTimestamp: Math.floor(Date.now() / 1000),
+    };
+
+    await adapter.handleMessage(mockSocket, msg);
+    assert.equal(sentMessages.length, 1);
+  });
+
+  it('forwards weather query "What is the weather in Chennai?" to /api/chat for authorized sender', async () => {
+    const sentMessages = [];
+    const mockSocket = {
+      sendMessage: async (jid, content) => { sentMessages.push({ jid, content }); }
+    };
+
+    const msg = {
+      key: { fromMe: false, remoteJid: '919042099020@s.whatsapp.net' },
+      message: { conversation: 'What is the weather in Chennai?' },
+      messageTimestamp: Math.floor(Date.now() / 1000),
+    };
+
+    await adapter.handleMessage(mockSocket, msg);
+    assert.equal(sentMessages.length, 1);
   });
 });
 

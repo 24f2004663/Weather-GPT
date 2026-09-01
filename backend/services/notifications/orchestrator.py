@@ -83,6 +83,35 @@ class NotificationOrchestrator:
                 return True
             return False
 
+    async def is_phone_subscribed(self, phone: str) -> bool:
+        """
+        Checks whether a normalized phone number belongs to an active, opted-in Emergency Alert subscriber.
+        Used as the authoritative authorization source for the WhatsApp chatbot sidecar.
+        """
+        clean_target = "".join(c for c in phone if c.isdigit())
+        if not clean_target:
+            return False
+
+        async with self._lock:
+            for sub in self._subscriptions.values():
+                if not sub.is_opted_in:
+                    continue
+                
+                # Check all phone fields associated with the subscription
+                candidate_phones = [sub.phone_number, sub.whatsapp_number, sub.user_identifier]
+                for cp in candidate_phones:
+                    if not cp:
+                        continue
+                    clean_cp = "".join(c for c in cp if c.isdigit())
+                    if not clean_cp:
+                        continue
+                    # Match exact digits or last 10 digits (handling country code prefixes like +91 / 91)
+                    if clean_cp == clean_target:
+                        return True
+                    if len(clean_cp) >= 10 and len(clean_target) >= 10 and clean_cp[-10:] == clean_target[-10:]:
+                        return True
+        return False
+
     async def handle_alert_event(self, event: DisasterAlertTriggeredEvent) -> List[NotificationRecord]:
         """
         Orchestrates concurrent, fault-isolated multi-channel delivery when an official disaster alert occurs.

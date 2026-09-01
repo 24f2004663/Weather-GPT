@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from backend.main import app, notification_orchestrator
 from backend.core.config import settings
 from backend.schemas.alerts import DisasterAlert, AlertSeverity, AlertUrgency, AlertCertainty, AlertStatus, GeographicScope
 from backend.schemas.chat import ChatResponse, ChatMessage
@@ -451,3 +451,34 @@ class TestNotificationServices(unittest.TestCase):
             self.assertIn("application/xml", res.headers["content-type"])
             self.assertIn("<Response><Message>", res.text)
             self.assertIn("It will not rain in Chennai today.", res.text)
+
+    # 17. Subscriber Verification Tests
+    def test_subscriber_verification_endpoint(self):
+        # Register a test subscriber
+        asyncio.run(notification_orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier="sub_test_user",
+            phone_number="+919940148758",
+            whatsapp_number="+919940148758",
+            enabled_channels=[NotificationChannel.WHATSAPP],
+            is_opted_in=True
+        )))
+
+        # Verify exact number
+        res = self.client.get("/api/notifications/subscriber/verify?phone=%2B919940148758")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()["is_subscribed"])
+
+        # Verify national format digits (without +)
+        res2 = self.client.get("/api/notifications/subscriber/verify?phone=919940148758")
+        self.assertEqual(res2.status_code, 200)
+        self.assertTrue(res2.json()["is_subscribed"])
+
+        # Verify 10-digit format
+        res3 = self.client.get("/api/notifications/subscriber/verify?phone=9940148758")
+        self.assertEqual(res3.status_code, 200)
+        self.assertTrue(res3.json()["is_subscribed"])
+
+        # Verify unregistered number returns False
+        res4 = self.client.get("/api/notifications/subscriber/verify?phone=911111111111")
+        self.assertEqual(res4.status_code, 200)
+        self.assertFalse(res4.json()["is_subscribed"])

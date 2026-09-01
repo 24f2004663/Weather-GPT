@@ -9,6 +9,7 @@ interface NotificationSettingsModalProps {
   onClose: () => void;
   selectedLocation: LocationResult | null;
   currentLanguage: string;
+  onSubscriptionChange?: (isSubscribed: boolean) => void;
 }
 
 export default function NotificationSettingsModal({
@@ -16,6 +17,7 @@ export default function NotificationSettingsModal({
   onClose,
   selectedLocation,
   currentLanguage,
+  onSubscriptionChange,
 }: NotificationSettingsModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [channels, setChannels] = useState<{ whatsapp: boolean; sms: boolean; voice: boolean; web_push: boolean }>({
@@ -141,6 +143,7 @@ export default function NotificationSettingsModal({
         throw new Error(errData.detail || 'Failed to save notification preferences.');
       }
       setIsSubscribed(true);
+      if (onSubscriptionChange) onSubscriptionChange(true);
       setStatusMessage('Preferences saved. You are opted in for disaster alerts.');
     } catch (err: any) {
       setStatusMessage(err.message || 'Error updating preferences.');
@@ -158,6 +161,7 @@ export default function NotificationSettingsModal({
       });
       if (res.ok) {
         setIsSubscribed(false);
+        if (onSubscriptionChange) onSubscriptionChange(false);
         setStatusMessage('Successfully unsubscribed from emergency alerts.');
       }
     } catch (err: any) {

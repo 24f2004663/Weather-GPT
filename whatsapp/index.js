@@ -252,6 +252,66 @@ async function callWeatherGPTChat(messageText, sessionId) {
 }
 
 // ---------------------------------------------------------------------------
+// Subscriber Authorization Bridge
+// ---------------------------------------------------------------------------
+
+/**
+ * Queries the WeatherGPT backend /api/notifications/subscriber/verify endpoint
+ * to check if a phone number is an active, opted-in Emergency Alert subscriber.
+ */
+function checkBackendSubscriber(phone) {
+  const url = new URL('/api/notifications/subscriber/verify', CONFIG.apiUrl);
+  url.searchParams.set('phone', phone);
+
+  return new Promise((resolve) => {
+    const transport = url.protocol === 'https:' ? https : http;
+    const req = transport.request(url, { method: 'GET', timeout: 5000 }, (res) => {
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            const data = JSON.parse(body);
+            resolve(Boolean(data.is_subscribed));
+          } catch (_) {
+            resolve(false);
+          }
+        } else {
+          resolve(false);
+        }
+      });
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => { req.destroy(); resolve(false); });
+    req.end();
+  });
+}
+
+/**
+ * Authoritative sender authorization function.
+ * Primary source: Emergency Alert subscription registry.
+ * Secondary source: Optional WHATSAPP_ALLOWED_NUMBERS dev override (if configured).
+ */
+async function isAuthorizedSender(phone) {
+  if (!phone || phone.length < 7) return false;
+
+  // 1. Authoritative: Emergency Alert subscriber registry
+  try {
+    const isSubscribed = await checkBackendSubscriber(phone);
+    if (isSubscribed) return true;
+  } catch (err) {
+    log('error', { reason: 'subscriber_check_failed', error: err.message, phone_suffix: phone.slice(-4) });
+  }
+
+  // 2. Local dev override fallback
+  if (CONFIG.allowedNumbers.size > 0 && CONFIG.allowedNumbers.has(phone)) {
+    return true;
+  }
+
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Message Handler
 // ---------------------------------------------------------------------------
 
@@ -287,9 +347,10 @@ async function handleMessage(socket, msg) {
   // 4. Resolve sender phone number (handles both @s.whatsapp.net and privacy @lid)
   const phone = await resolveSenderPhone(socket, jid, msg);
 
-  // 5. Allowlist check
-  if (!CONFIG.allowedNumbers.has(phone)) {
-    log('ignored', { reason: 'not_allowlisted', phone_suffix: phone.slice(-4) });
+  // 5. Emergency Alert Subscription Authorization check
+  const authorized = await isAuthorizedSender(phone);
+  if (!authorized) {
+    log('ignored', { reason: 'not_subscribed', phone_suffix: phone.slice(-4) });
     return;
   }
 
@@ -443,6 +504,8 @@ module.exports = {
   parseAllowedNumbers,
   jidToPhone,
   resolveSenderPhone,
+  checkBackendSubscriber,
+  isAuthorizedSender,
   phoneToSessionId,
   checkRateLimit,
   callWeatherGPTChat,

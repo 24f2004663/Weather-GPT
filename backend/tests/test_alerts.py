@@ -33,7 +33,7 @@ SAMPLE_CAP_XML = """<?xml version="1.0" encoding="UTF-8"?>
       <cap:description>Heavy to very heavy rainfall expected across Chennai, Tiruvallur, and Kanchipuram districts.</cap:description>
       <cap:instruction>Fishermen are advised not to venture into sea. Stay indoors in secure shelters.</cap:instruction>
       <cap:effective>2026-08-30T06:00:00+00:00</cap:effective>
-      <cap:expires>2026-09-02T18:00:00+00:00</cap:expires>
+      <cap:expires>2026-09-30T18:00:00+00:00</cap:expires>
       <cap:areaDesc>Coastal Tamil Nadu (Chennai, Tiruvallur, Kanchipuram)</cap:areaDesc>
     </item>
     <item>
@@ -50,7 +50,7 @@ SAMPLE_CAP_XML = """<?xml version="1.0" encoding="UTF-8"?>
       <cap:description>Day temperatures likely to exceed 43°C in parts of Rajasthan.</cap:description>
       <cap:instruction>Drink plenty of water and avoid direct sun exposure between 12 PM and 3 PM.</cap:instruction>
       <cap:effective>2026-08-30T05:00:00+00:00</cap:effective>
-      <cap:expires>2026-09-01T12:00:00+00:00</cap:expires>
+      <cap:expires>2026-09-30T12:00:00+00:00</cap:expires>
       <cap:areaDesc>Western Rajasthan</cap:areaDesc>
     </item>
     <item>

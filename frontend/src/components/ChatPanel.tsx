@@ -7,9 +7,16 @@ import { sendChatMessage, transcribeAudio } from '../lib/api';
 interface ChatPanelProps {
   selectedLocation: LocationResult | null;
   currentLanguage?: string;
+  isAlertSubscribed?: boolean;
+  onOpenNotificationSettings?: () => void;
 }
 
-export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: ChatPanelProps) {
+export default function ChatPanel({
+  selectedLocation,
+  currentLanguage = 'en',
+  isAlertSubscribed = false,
+  onOpenNotificationSettings,
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
@@ -23,6 +30,16 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
   const [sessionId, setSessionId] = useState<string>('');
   const [referencedData, setReferencedData] = useState<Record<string, any> | null>(null);
   const [showReferenced, setShowReferenced] = useState(false);
+
+  const handleWhatsAppClick = () => {
+    if (isAlertSubscribed) {
+      if (typeof window !== 'undefined') {
+        window.open('https://wa.me/919042099020?text=Hi%20WeatherGPT', '_blank', 'noopener,noreferrer');
+      }
+    } else {
+      onOpenNotificationSettings?.();
+    }
+  };
 
   // Voice STT State
   const [isRecording, setIsRecording] = useState(false);
@@ -245,7 +262,7 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
   ];
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 flex flex-col h-[680px] relative overflow-hidden">
+    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 flex flex-col h-[740px] relative overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
         <div className="flex items-center space-x-2.5">
@@ -412,6 +429,43 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
             className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-semibold px-3.5 py-1.5 rounded-xl text-xs transition-all shadow-lg shadow-sky-600/20"
           >
             Send
+          </button>
+        </div>
+      </div>
+
+      {/* WhatsApp Chatbot CTA Card */}
+      <div className="pt-1">
+        <div className="bg-slate-950/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-2xl p-3 transition-all shadow-md flex items-center justify-between gap-3">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-sm text-white shadow-md shadow-emerald-500/20 flex-shrink-0">
+              💬
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+                <span>Try our WhatsApp Chatbot</span>
+                {isAlertSubscribed ? (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    Active
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-800">
+                    Alerts Required
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 truncate">
+                Chat with WeatherGPT on WhatsApp
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleWhatsAppClick}
+            className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1"
+          >
+            <span>Try WhatsApp</span>
+            <span className="text-[10px]">↗</span>
           </button>
         </div>
       </div>

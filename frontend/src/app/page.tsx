@@ -20,7 +20,7 @@ import {
   NasaPowerClimateResponse,
   DisasterAlert,
 } from '../types';
-import { getWeatherForecast, getHistoricalClimate, fetchDisasterAlerts } from '../lib/api';
+import { getWeatherForecast, getHistoricalClimate, fetchDisasterAlerts, API_BASE_URL } from '../lib/api';
 
 // Default initial location: Chennai, Tamil Nadu, India
 const DEFAULT_LOCATION: LocationResult = {
@@ -38,6 +38,7 @@ export default function HomePage() {
   const [selectedLocation, setSelectedLocation] = useState<LocationResult>(DEFAULT_LOCATION);
   const [currentLanguage, setCurrentLanguage] = useState<string>('en');
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState<boolean>(false);
+  const [isAlertSubscribed, setIsAlertSubscribed] = useState<boolean>(false);
   const [weatherData, setWeatherData] = useState<NormalizedWeatherResponse | null>(null);
   const [climateData, setClimateData] = useState<NasaPowerClimateResponse | null>(null);
   const [alerts, setAlerts] = useState<DisasterAlert[] | null>(null);
@@ -96,6 +97,18 @@ export default function HomePage() {
     loadDataForLocation(selectedLocation);
   }, [selectedLocation, loadDataForLocation]);
 
+  // Fetch initial Emergency Alert subscription status
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/notifications/preferences?user_id=weathergpt_web_user`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && data.is_opted_in) {
+          setIsAlertSubscribed(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const handleSelectLocation = (newLoc: LocationResult) => {
     setSelectedLocation(newLoc);
   };
@@ -118,6 +131,7 @@ export default function HomePage() {
         onClose={() => setIsNotificationModalOpen(false)}
         selectedLocation={selectedLocation}
         currentLanguage={currentLanguage}
+        onSubscriptionChange={setIsAlertSubscribed}
       />
 
       {/* Main Content Area */}
@@ -199,6 +213,8 @@ export default function HomePage() {
             <ChatPanel
               selectedLocation={selectedLocation}
               currentLanguage={currentLanguage}
+              isAlertSubscribed={isAlertSubscribed}
+              onOpenNotificationSettings={() => setIsNotificationModalOpen(true)}
             />
           </section>
         </div>
