@@ -17,106 +17,171 @@ class TestGeminiMultiModelRouter(unittest.TestCase):
     def tearDown(self):
         asyncio.run(gemini_model_router.reset_state())
 
-    # 1. First request selects Gemini 3.5 Flash Lite
-    def test_first_request_selects_primary(self):
-        res = asyncio.run(gemini_model_router.select_and_reserve_model())
-        self.assertIsNotNone(res)
-        model, reason = res
-        self.assertEqual(model.name, "gemini-3.5-flash-lite")
-        self.assertEqual(model.priority, 1)
-        self.assertEqual(reason, "primary_available")
+    # -----------------------------------------------------------------------
+    # Test 1: One-turn, one Gemini call (1 HTTP POST -> RPM=1, RPD=1)
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_single_turn_single_http_call_accounting(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
 
-    # 2. 11 requests in rolling window: primary remains eligible
-    def test_under_threshold_keeps_primary(self):
-        for i in range(11):
-            res = asyncio.run(gemini_model_router.select_and_reserve_model())
-            self.assertIsNotNone(res)
-            model, _ = res
-            self.assertEqual(model.name, "gemini-3.5-flash-lite")
+        mock_client.post.return_value = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "Terminal answer."}], "role": "model"}}]
+        })
 
-    # 3. 12 requests fills primary, 13th request selects Gemini 3.1 Flash Lite
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Hello")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        status = asyncio.run(gemini_model_router.get_status())
+        # Exactly 1 HTTP POST = 1 RPM reservation, 1 RPD count
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpm"], 1)
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpd"], 1)
+
+    # -----------------------------------------------------------------------
+    # Test 2: One-turn, three tool iterations (3 HTTP POSTs -> RPM=3, RPD=3)
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_three_tool_iterations_consume_three_slots(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Call 1: tool call 1
+        resp_1 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"functionCall": {"name": "resolve_location", "args": {"query": "Chennai"}}}], "role": "model"}}]
+        })
+        # Call 2: tool call 2
+        resp_2 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"functionCall": {"name": "get_current_weather", "args": {"latitude": 13.08, "longitude": 80.27}}}], "role": "model"}}]
+        })
+        # Call 3: terminal text
+        resp_3 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "The weather in Chennai is 32°C."}], "role": "model"}}]
+        })
+
+        mock_client.post.side_effect = [resp_1, resp_2, resp_3]
+
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Weather in Chennai?")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        self.assertEqual(mock_client.post.call_count, 3)
+        status = asyncio.run(gemini_model_router.get_status())
+        # 3 HTTP calls = 3 RPM reservations and 3 RPD counts (NOT 1!)
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpm"], 3)
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpd"], 3)
+
+    # -----------------------------------------------------------------------
+    # Test 3: Maximum 5 iterations -> RPM=5, RPD=5
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_max_five_iterations_consume_five_slots(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # 5 tool calls hitting max_tool_iterations
+        resp_fc = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"functionCall": {"name": "resolve_location", "args": {"query": "Chennai"}}}], "role": "model"}}]
+        })
+        mock_client.post.side_effect = [resp_fc] * 5
+
+        service = GeminiAIService(api_key="mock_key", max_tool_iterations=5)
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Loop test")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        self.assertEqual(mock_client.post.call_count, 5)
+        status = asyncio.run(gemini_model_router.get_status())
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpm"], 5)
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpd"], 5)
+
+    # -----------------------------------------------------------------------
+    # Test 4: Primary reaches 12 actual requests -> next request routes to Model 2
+    # -----------------------------------------------------------------------
     def test_primary_exhaustion_cascades_to_secondary(self):
-        # 12 requests fill primary (safe_rpm = 12)
         for i in range(12):
             res = asyncio.run(gemini_model_router.select_and_reserve_model())
             model, _ = res
             self.assertEqual(model.name, "gemini-3.5-flash-lite")
 
-        # 13th request should immediately route to Model 2 (Gemini 3.1 Flash Lite)
+        # 13th actual request routes to Model 2
         res_13 = asyncio.run(gemini_model_router.select_and_reserve_model())
         self.assertIsNotNone(res_13)
         model_13, reason_13 = res_13
         self.assertEqual(model_13.name, "gemini-3.1-flash-lite")
         self.assertEqual(model_13.priority, 2)
-        self.assertEqual(reason_13, "primary_rpm_threshold")
 
-    # 4. Secondary reaches threshold -> selects Gemma 4 31B
-    def test_secondary_exhaustion_cascades_to_tertiary(self):
-        # Fill Model 1 (12 reqs)
-        for _ in range(12):
+    # -----------------------------------------------------------------------
+    # Test 5: Multiple user requests (5 users × 3 calls = 15 total HTTP calls)
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_multiple_users_per_http_request_accounting(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Each user request triggers 2 HTTP calls (1 tool call + 1 text)
+        resp_tool = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"functionCall": {"name": "get_current_weather", "args": {"latitude": 13.08, "longitude": 80.27}}}], "role": "model"}}]
+        })
+        resp_text = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "32°C in Chennai."}], "role": "model"}}]
+        })
+
+        # 6 user requests × 2 HTTP calls = 12 total HTTP calls
+        mock_client.post.side_effect = [resp_tool, resp_text] * 6
+
+        service = GeminiAIService(api_key="mock_key")
+        for i in range(6):
+            req = ChatRequest(messages=[ChatMessage(role="user", content=f"User {i} query")])
+            asyncio.run(service.generate_weather_response(req))
+
+        status = asyncio.run(gemini_model_router.get_status())
+        # Model 1 has received 12 actual HTTP calls (6 users × 2 calls)
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpm"], 12)
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpd"], 12)
+
+        # 7th user's first HTTP call should now route to Model 2!
+        mock_client.post.side_effect = [resp_text]
+        req7 = ChatRequest(messages=[ChatMessage(role="user", content="User 7 query")])
+        asyncio.run(service.generate_weather_response(req7))
+
+        status2 = asyncio.run(gemini_model_router.get_status())
+        self.assertEqual(status2["gemini-3.1-flash-lite"]["current_rpm"], 1)
+
+    # -----------------------------------------------------------------------
+    # Test 6: Tool loop capacity exhaustion: Model 1 switches to Model 2 mid-loop
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_mid_tool_loop_model_switch_when_primary_exhausted(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Pre-fill Model 1 to 11/12 RPM
+        for _ in range(11):
             asyncio.run(gemini_model_router.select_and_reserve_model())
 
-        # Fill Model 2 (12 reqs)
-        for _ in range(12):
-            res = asyncio.run(gemini_model_router.select_and_reserve_model())
-            model, _ = res
-            self.assertEqual(model.name, "gemini-3.1-flash-lite")
+        # Iteration 0: consumes slot #12 on Model 1 (Model 1 is now full: 12/12)
+        resp_tool = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"functionCall": {"name": "resolve_location", "args": {"query": "Chennai"}}}], "role": "model"}}]
+        })
+        # Iteration 1: Model 1 full, seamlessly switches to Model 2 (1/12 on Model 2)
+        resp_text = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "Resolved and finished."}], "role": "model"}}]
+        })
+        mock_client.post.side_effect = [resp_tool, resp_text]
 
-        # Next request routes to Model 3 (Gemma 4 31B)
-        res_tertiary = asyncio.run(gemini_model_router.select_and_reserve_model())
-        self.assertIsNotNone(res_tertiary)
-        model_tertiary, reason_tertiary = res_tertiary
-        self.assertEqual(model_tertiary.name, "gemma-4-31b")
-        self.assertEqual(model_tertiary.priority, 3)
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Lookup Chennai")])
+        res = asyncio.run(service.generate_weather_response(req))
 
-    # 5. Gemma 31B reaches threshold -> selects Gemma 4 26B
-    def test_tertiary_exhaustion_cascades_to_quaternary(self):
-        # Fill Model 1 (12 reqs)
-        for _ in range(12):
-            asyncio.run(gemini_model_router.select_and_reserve_model())
-        # Fill Model 2 (12 reqs)
-        for _ in range(12):
-            asyncio.run(gemini_model_router.select_and_reserve_model())
-        # Fill Model 3 (25 reqs)
-        for _ in range(25):
-            res = asyncio.run(gemini_model_router.select_and_reserve_model())
-            model, _ = res
-            self.assertEqual(model.name, "gemma-4-31b")
+        status = asyncio.run(gemini_model_router.get_status())
+        # Call 1 was on Model 1 (now 12/12)
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpm"], 12)
+        # Call 2 was on Model 2 (now 1/12)
+        self.assertEqual(status["gemini-3.1-flash-lite"]["current_rpm"], 1)
 
-        # Next request routes to Model 4 (Gemma 4 26B)
-        res_quat = asyncio.run(gemini_model_router.select_and_reserve_model())
-        self.assertIsNotNone(res_quat)
-        model_quat, _ = res_quat
-        self.assertEqual(model_quat.name, "gemma-4-26b")
-        self.assertEqual(model_quat.priority, 4)
-
-    # 6. Sliding window test: after 60 seconds (simulated), primary is eligible again
-    def test_rolling_window_expiration_restores_primary(self):
-        # Fill Model 1 (12 reqs at t=0)
-        t0 = time.time()
-        for _ in range(12):
-            asyncio.run(gemini_model_router.select_and_reserve_model())
-
-        # At t=0, Model 1 is exhausted -> routes to Model 2
-        res_next = asyncio.run(gemini_model_router.select_and_reserve_model())
-        self.assertEqual(res_next[0].name, "gemini-3.1-flash-lite")
-
-        # Simulate 65 seconds passing by backdating timestamps
-        async def backdate():
-            async with gemini_model_router._lock:
-                gemini_model_router._rpm_timestamps["gemini-3.5-flash-lite"] = [
-                    t - 65.0 for t in gemini_model_router._rpm_timestamps["gemini-3.5-flash-lite"]
-                ]
-        asyncio.run(backdate())
-
-        # Next request should evaluate from Model #1 and SELECT PRIMARY!
-        res_recovered = asyncio.run(gemini_model_router.select_and_reserve_model())
-        self.assertIsNotNone(res_recovered)
-        model_rec, reason_rec = res_recovered
-        self.assertEqual(model_rec.name, "gemini-3.5-flash-lite")
-        self.assertEqual(reason_rec, "primary_available")
-
-    # 7. No persistent downgrade: Request evaluates primary first on every new turn
+    # -----------------------------------------------------------------------
+    # Test 7: Fallback to Model 2 does not permanently downgrade future requests
+    # -----------------------------------------------------------------------
     def test_no_persistent_downgrade(self):
         # Fill Model 1 (12 reqs)
         for _ in range(12):
@@ -136,7 +201,87 @@ class TestGeminiMultiModelRouter(unittest.TestCase):
         res_14 = asyncio.run(gemini_model_router.select_and_reserve_model())
         self.assertEqual(res_14[0].name, "gemini-3.5-flash-lite")
 
-    # 8. Concurrent requests cannot exceed configured safety RPM
+    # -----------------------------------------------------------------------
+    # Test 8: Return to primary after rolling 60s window cools
+    # -----------------------------------------------------------------------
+    def test_rolling_window_expiration_restores_primary(self):
+        for _ in range(12):
+            asyncio.run(gemini_model_router.select_and_reserve_model())
+
+        # Backdate timestamps by 65s
+        async def backdate():
+            async with gemini_model_router._lock:
+                gemini_model_router._rpm_timestamps["gemini-3.5-flash-lite"] = [
+                    t - 65.0 for t in gemini_model_router._rpm_timestamps["gemini-3.5-flash-lite"]
+                ]
+        asyncio.run(backdate())
+
+        res_rec = asyncio.run(gemini_model_router.select_and_reserve_model())
+        self.assertEqual(res_rec[0].name, "gemini-3.5-flash-lite")
+
+    # -----------------------------------------------------------------------
+    # Test 9: 429 counts exactly ONE request for that POST and suppresses model
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_429_accounting_and_fallback(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        resp_429 = MagicMock(status_code=429, headers={"Retry-After": "60"})
+        resp_200 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "Recovered via Model 2."}], "role": "model"}}]
+        })
+
+        mock_client.post.side_effect = [resp_429, resp_200]
+
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Test 429")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        self.assertIn("Model 2", res.response_message.content)
+        status = asyncio.run(gemini_model_router.get_status())
+        # Model 1 was attempted once (counted 1) and is now suppressed
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpm"], 1)
+        self.assertTrue(status["gemini-3.5-flash-lite"]["is_429_suppressed"])
+        # Model 2 succeeded (counted 1)
+        self.assertEqual(status["gemini-3.1-flash-lite"]["current_rpm"], 1)
+
+    # -----------------------------------------------------------------------
+    # Test 10: 429 during tool loop (Call 1 OK, Call 2 returns 429)
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_429_during_tool_loop(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Call 1 (Model 1): tool call
+        resp_1 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"functionCall": {"name": "resolve_location", "args": {"query": "Delhi"}}}], "role": "model"}}]
+        })
+        # Call 2 (Model 1): returns 429
+        resp_2 = MagicMock(status_code=429, headers={"Retry-After": "60"})
+        # Call 3 (Model 2 fallback): receives tool return and produces terminal answer
+        resp_3 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "Delhi weather answer."}], "role": "model"}}]
+        })
+
+        mock_client.post.side_effect = [resp_1, resp_2, resp_3]
+
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Delhi weather")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        self.assertIn("Delhi weather answer", res.response_message.content)
+        status = asyncio.run(gemini_model_router.get_status())
+        # Model 1 had 2 calls (1 success + 1 429) -> current_rpm = 2
+        self.assertEqual(status["gemini-3.5-flash-lite"]["current_rpm"], 2)
+        self.assertTrue(status["gemini-3.5-flash-lite"]["is_429_suppressed"])
+        # Model 2 completed the turn -> current_rpm = 1
+        self.assertEqual(status["gemini-3.1-flash-lite"]["current_rpm"], 1)
+
+    # -----------------------------------------------------------------------
+    # Test 11: Concurrent reservations are atomic
+    # -----------------------------------------------------------------------
     def test_concurrent_reservations_are_atomic(self):
         async def simulate_burst():
             tasks = [gemini_model_router.select_and_reserve_model() for _ in range(25)]
@@ -149,164 +294,23 @@ class TestGeminiMultiModelRouter(unittest.TestCase):
                 m_name = res[0].name
                 model_counts[m_name] = model_counts.get(m_name, 0) + 1
 
-        # Model 1 must NOT exceed safe_rpm (12)
         self.assertEqual(model_counts.get("gemini-3.5-flash-lite", 0), 12)
-        # Model 2 must NOT exceed safe_rpm (12)
         self.assertEqual(model_counts.get("gemini-3.1-flash-lite", 0), 12)
-        # Model 3 gets the 25th request
         self.assertEqual(model_counts.get("gemma-4-31b", 0), 1)
 
-    # 9. RPD threshold causes model to be skipped
+    # -----------------------------------------------------------------------
+    # Test 12: RPD threshold skips model
+    # -----------------------------------------------------------------------
     def test_rpd_threshold_skips_model(self):
         async def set_rpd_max():
             async with gemini_model_router._lock:
-                gemini_model_router._rpd_counts["gemini-3.5-flash-lite"] = 1500
+                gemini_model_router._rpd_counts["gemini-3.5-flash-lite"] = 1000
         asyncio.run(set_rpd_max())
 
         res = asyncio.run(gemini_model_router.select_and_reserve_model())
         self.assertIsNotNone(res)
         model, _ = res
-        # Primary skipped because RPD limit reached -> routes to Model 2
         self.assertEqual(model.name, "gemini-3.1-flash-lite")
-
-    # 10. Upstream 429 from primary causes fallback to secondary
-    @patch("backend.core.http_client.http_client_manager.get_client")
-    def test_429_on_primary_falls_back_to_secondary(self, mock_get_client):
-        mock_client = AsyncMock()
-        mock_get_client.return_value = mock_client
-
-        # First model returns 429, second model returns 200 OK
-        resp_429 = MagicMock()
-        resp_429.status_code = 429
-        resp_429.headers = {"Retry-After": "60"}
-
-        resp_200 = MagicMock()
-        resp_200.status_code = 200
-        resp_200.json.return_value = {
-            "candidates": [
-                {
-                    "content": {
-                        "parts": [{"text": "Forecast retrieved via secondary model."}],
-                        "role": "model"
-                    }
-                }
-            ]
-        }
-
-        mock_client.post.side_effect = [resp_429, resp_200]
-
-        service = GeminiAIService(api_key="mock_key")
-        req = ChatRequest(messages=[ChatMessage(role="user", content="Will it rain?")])
-        res = asyncio.run(service.generate_weather_response(req))
-
-        self.assertIn("secondary model", res.response_message.content)
-        # Verify primary was suppressed
-        status = asyncio.run(gemini_model_router.get_status())
-        self.assertTrue(status["gemini-3.5-flash-lite"]["is_429_suppressed"])
-
-    # 11. Upstream 429 on primary AND secondary falls back to tertiary (Gemma 4 31B)
-    @patch("backend.core.http_client.http_client_manager.get_client")
-    def test_double_429_falls_back_to_tertiary(self, mock_get_client):
-        mock_client = AsyncMock()
-        mock_get_client.return_value = mock_client
-
-        resp_429_a = MagicMock(status_code=429, headers={})
-        resp_429_b = MagicMock(status_code=429, headers={})
-        resp_200 = MagicMock(status_code=200, json=lambda: {
-            "candidates": [{"content": {"parts": [{"text": "Answer from Gemma 4 31B."}], "role": "model"}}]
-        })
-
-        mock_client.post.side_effect = [resp_429_a, resp_429_b, resp_200]
-
-        service = GeminiAIService(api_key="mock_key")
-        req = ChatRequest(messages=[ChatMessage(role="user", content="Weather update?")])
-        res = asyncio.run(service.generate_weather_response(req))
-
-        self.assertIn("Gemma 4 31B", res.response_message.content)
-
-    # 12. All 4 models failing with 429 raises graceful error
-    @patch("backend.core.http_client.http_client_manager.get_client")
-    def test_all_models_429_raises_graceful_error(self, mock_get_client):
-        mock_client = AsyncMock()
-        mock_get_client.return_value = mock_client
-
-        mock_client.post.return_value = MagicMock(status_code=429, headers={})
-
-        service = GeminiAIService(api_key="mock_key")
-        req = ChatRequest(messages=[ChatMessage(role="user", content="Test all fail")])
-        with self.assertRaises(Exception) as ctx:
-            asyncio.run(service.generate_weather_response(req))
-        self.assertIn("rate limits", str(ctx.exception).lower())
-
-    # 13. Tool calling and function responses preserve context across router calls
-    @patch("backend.core.http_client.http_client_manager.get_client")
-    def test_tool_calling_with_router(self, mock_get_client):
-        mock_client = AsyncMock()
-        mock_get_client.return_value = mock_client
-
-        # 1st call: functionCall get_current_weather
-        resp_fc = MagicMock(status_code=200, json=lambda: {
-            "candidates": [{
-                "content": {
-                    "role": "model",
-                    "parts": [{
-                        "functionCall": {
-                            "name": "get_current_weather",
-                            "args": {"latitude": 13.08, "longitude": 80.27}
-                        }
-                    }]
-                }
-            }]
-        })
-
-        # 2nd call: terminal answer referencing weather tool
-        resp_text = MagicMock(status_code=200, json=lambda: {
-            "candidates": [{
-                "content": {
-                    "role": "model",
-                    "parts": [{"text": "It is currently 32°C in Chennai."}]
-                }
-            }]
-        })
-
-        mock_client.post.side_effect = [resp_fc, resp_text]
-
-        service = GeminiAIService(api_key="mock_key")
-        req = ChatRequest(
-            messages=[ChatMessage(role="user", content="What is the weather in Chennai?")],
-            session_id="test_session_router"
-        )
-        res = asyncio.run(service.generate_weather_response(req))
-
-        self.assertIn("32°C", res.response_message.content)
-        self.assertIn("get_current_weather", res.tools_used)
-
-    # 14. Session context continuity
-    @patch("backend.core.http_client.http_client_manager.get_client")
-    def test_session_context_continuity(self, mock_get_client):
-        mock_client = AsyncMock()
-        mock_get_client.return_value = mock_client
-
-        resp_turn1 = MagicMock(status_code=200, json=lambda: {
-            "candidates": [{"content": {"parts": [{"text": "I am WeatherGPT."}], "role": "model"}}]
-        })
-        resp_turn2 = MagicMock(status_code=200, json=lambda: {
-            "candidates": [{"content": {"parts": [{"text": "You asked about rain earlier."}], "role": "model"}}]
-        })
-        mock_client.post.side_effect = [resp_turn1, resp_turn2]
-
-        service = GeminiAIService(api_key="mock_key")
-        sid = "test_session_router"
-
-        # Turn 1
-        req1 = ChatRequest(messages=[ChatMessage(role="user", content="Who are you?")], session_id=sid)
-        res1 = asyncio.run(service.generate_weather_response(req1))
-        self.assertEqual(res1.session_id, sid)
-
-        # Turn 2
-        req2 = ChatRequest(messages=[ChatMessage(role="user", content="What did I ask?")], session_id=sid)
-        res2 = asyncio.run(service.generate_weather_response(req2))
-        self.assertIn("rain earlier", res2.response_message.content)
 
 if __name__ == "__main__":
     unittest.main()

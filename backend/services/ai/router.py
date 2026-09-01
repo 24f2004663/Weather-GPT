@@ -38,15 +38,10 @@ class GeminiModelRouter:
     """
     Concurrency-safe, quota-aware multi-model Gemini router.
     
-    Model Priority Cascade:
-    1. Gemini 3.5 Flash Lite (Primary)
-    2. Gemini 3.1 Flash Lite (Secondary)
-    3. Gemma 4 31B (Tertiary)
-    4. Gemma 4 26B (Quaternary)
-
     Guarantees:
-    - Zero permanent downgrade: every request evaluates models from #1 in priority order.
-    - Rolling 60-second sliding RPM window.
+    - 1 Actual Gemini HTTP POST = 1 RPM Reservation = 1 RPD Count.
+    - Zero permanent downgrade: every HTTP request starts evaluating from Model #1.
+    - Continuous rolling 60-second sliding RPM window.
     - Midnight US/Pacific daily RPD reset tracking.
     - In-flight concurrency safety via asyncio.Lock.
     - Temporary model suppression and automatic cascade fallback on HTTP 429.
@@ -129,8 +124,9 @@ class GeminiModelRouter:
         estimated_tokens: int = 1000
     ) -> Optional[Tuple[GeminiModelConfig, str]]:
         """
-        Atomically selects the highest-priority eligible model and reserves quota.
-        Always starts evaluation from Model #1 (Gemini 3.5 Flash Lite).
+        Atomically selects the highest-priority eligible model and reserves quota
+        for ONE upcoming outbound Gemini HTTP request.
+        Always evaluates models in strict priority order (1 -> 2 -> 3 -> 4).
         """
         excluded = excluded_models or set()
         now = time.time()
@@ -141,7 +137,7 @@ class GeminiModelRouter:
             skipped_reasons = []
 
             for model in self._models:
-                # 1. Skip explicitly excluded models (e.g. from current retry turn)
+                # 1. Skip explicitly excluded models for this attempt
                 if model.name in excluded:
                     skipped_reasons.append(f"{model.name}:excluded")
                     continue
@@ -170,12 +166,13 @@ class GeminiModelRouter:
                     skipped_reasons.append(f"{model.name}:tpm_limit({current_tpm}/{model.safe_tpm})")
                     continue
 
-                # Model is eligible! Reserve slot atomically
+                # Model is eligible! Reserve slot atomically for this HTTP request
                 self._rpm_timestamps[model.name].append(now)
                 self._tpm_records[model.name].append((now, estimated_tokens))
                 self._rpd_counts[model.name] = current_rpd + 1
 
                 new_rpm = len(self._rpm_timestamps[model.name])
+                new_rpd = self._rpd_counts[model.name]
 
                 # Determine structured reason
                 if model.priority == 1:
@@ -187,7 +184,10 @@ class GeminiModelRouter:
                 else:
                     reason = "all_higher_priority_models_unavailable"
 
-                logger.info(f"[Gemini Router] selected={model.name} rpm={new_rpm}/{model.safe_rpm} reason={reason}")
+                logger.info(
+                    f"[Gemini Router] event=reserve model={model.name} "
+                    f"rpm={new_rpm}/{model.safe_rpm} rpd={new_rpd}/{model.safe_rpd} reason={reason}"
+                )
                 return model, reason
 
             logger.warning(f"[Gemini Router] all_models_unavailable. Details: {', '.join(skipped_reasons)}")
@@ -196,16 +196,17 @@ class GeminiModelRouter:
     async def record_429(self, model_name: str):
         """
         Marks model as temporarily suppressed after upstream 429 response.
+        The slot reservation already occurred before dispatch, so request accounting is preserved.
         """
         now = time.time()
         suppress_duration = settings.GEMINI_429_SUPPRESS_SECONDS
         async with self._lock:
             self._suppressed_until[model_name] = now + suppress_duration
-            logger.warning(f"[Gemini Router] model={model_name} event=429 action=temporary_suppress (for {suppress_duration}s)")
+            logger.warning(f"[Gemini Router] model={model_name} event=429 action=temporary_suppress (suppressed for {suppress_duration}s)")
 
     async def record_release(self, model_name: str, estimated_tokens: int = 1000):
         """
-        Releases reserved slot if a local routing error aborted before external dispatch.
+        Releases reserved slot if a local error aborted before external HTTP dispatch.
         """
         async with self._lock:
             if model_name in self._rpm_timestamps and self._rpm_timestamps[model_name]:
