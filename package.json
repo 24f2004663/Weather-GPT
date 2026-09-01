@@ -4,9 +4,10 @@
   "private": true,
   "description": "WeatherGPT: AI Weather Intelligence & Disaster Awareness Platform",
   "scripts": {
-    "dev:backend": "python3 -m uvicorn backend.main:app --reload --port 8000",
-    "dev:frontend": "cd frontend && npm run dev",
-    "test:backend": "python3 -m unittest discover -s backend/tests -v",
-    "build:frontend": "cd frontend && npm run build"
+    "dev": "npm --prefix frontend run dev",
+    "dev:backend": "python -m uvicorn backend.main:app --reload --port 8000",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "test:backend": "python -m unittest discover -s backend/tests -v",
+    "build:frontend": "npm --prefix frontend run build"
   }
 }
