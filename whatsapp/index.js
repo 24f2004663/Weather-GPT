@@ -1,21 +1,16 @@
 /**
  * WeatherGPT WhatsApp Adapter — Baileys Sidecar
  *
- * Bridges WhatsApp messages to the existing WeatherGPT /api/chat endpoint.
- * Runs as an independent Node.js process alongside the Python FastAPI backend.
+ * Bridges WhatsApp messages to the WeatherGPT /api/chat endpoint.
+ * Runs as an independent Node.js process alongside the FastAPI backend.
+ *
+ * Authoritative Authorization:
+ *   Every incoming WhatsApp message triggers a live, fresh lookup against the
+ *   backend /api/notifications/subscriber/verify endpoint (backed by Supabase public.alert_subscriptions).
+ *   Unregistered or opted-out numbers are rejected with 0 calls to /api/chat and 0 Gemini quota consumed.
  *
  * Architecture:
- *   WhatsApp User → Baileys → HTTP POST /api/chat → existing Gemini router → response → Baileys → WhatsApp User
- *
- * Safety controls:
- *   - Disabled by default (WHATSAPP_BOT_ENABLED=false)
- *   - Explicit sender allowlist (supports both standard phone JIDs and WhatsApp privacy LIDs)
- *   - Groups, broadcasts, status, own messages, non-text all ignored
- *   - Per-sender rate limiting (sliding window)
- *   - Message length rejection (not truncation)
- *   - Single controlled error reply on API failure (no retry)
- *   - Auth data stored locally, never committed to Git
- *   - No message content in logs by default
+ *   WhatsApp User → Baileys → Live Supabase Auth Gate → HTTP POST /api/chat → Gemini router → response → WhatsApp User
  */
 
 'use strict';
@@ -37,24 +32,23 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const CONFIG = Object.freeze({
   enabled:          (process.env.WHATSAPP_BOT_ENABLED || 'false').toLowerCase() === 'true',
-  allowedNumbers:   parseAllowedNumbers(process.env.WHATSAPP_ALLOWED_NUMBERS || ''),
   rateLimitPerMin:  parseInt(process.env.WHATSAPP_RATE_LIMIT_PER_MINUTE || '5', 10),
   maxMessageLen:    parseInt(process.env.WHATSAPP_MAX_MESSAGE_LENGTH || '1000', 10),
   apiUrl:           process.env.WEATHERGPT_API_URL || 'http://localhost:8000',
   authDir:          path.join(__dirname, 'auth'),
 });
 
-function parseAllowedNumbers(raw) {
-  if (!raw || !raw.trim()) return new Set();
-  return new Set(
-    raw.split(',')
-      .map(n => n.trim().replace(/\D/g, ''))  // Normalize to digits only
-      .filter(n => n.length >= 7)
-  );
+/**
+ * Normalizes any phone or JID string to numeric digits only.
+ * Example: "+91-90420-99020" → "919042099020"
+ */
+function normalizeDigits(raw) {
+  if (!raw) return '';
+  return String(raw).replace(/\D/g, '');
 }
 
 /**
- * Normalize a WhatsApp JID to digits-only phone number for allowlist comparison.
+ * Extracts phone digits from a standard WhatsApp JID.
  * Example: "919042099020@s.whatsapp.net" → "919042099020"
  */
 function jidToPhone(jid) {
@@ -63,8 +57,10 @@ function jidToPhone(jid) {
 }
 
 /**
- * Resolves the actual sender phone number from JID, metadata, or auth LID mapping.
- * WhatsApp often delivers messages via privacy LIDs (@lid), e.g. "231331770445968@lid".
+ * Resolves the actual sender phone number from JID, message metadata, Baileys signal repository,
+ * or local LID mapping files.
+ *
+ * WhatsApp frequently delivers messages via privacy LIDs (@lid), e.g. "231331770445968@lid".
  */
 async function resolveSenderPhone(socket, jid, msg) {
   if (!jid) return '';
@@ -84,6 +80,9 @@ async function resolveSenderPhone(socket, jid, msg) {
     }
     if (msg?.key?.participantPn && msg.key.participantPn.endsWith('@s.whatsapp.net')) {
       return msg.key.participantPn.split('@')[0].replace(/\D/g, '');
+    }
+    if (msg?.participant && msg.participant.endsWith('@s.whatsapp.net')) {
+      return msg.participant.split('@')[0].replace(/\D/g, '');
     }
 
     // Check Baileys signalRepository if available
@@ -108,6 +107,25 @@ async function resolveSenderPhone(socket, jid, msg) {
       }
     } catch (_) {}
 
+    // Check auth folder forward mapping file: lid-mapping-<phone>.json
+    try {
+      if (fs.existsSync(CONFIG.authDir)) {
+        const files = fs.readdirSync(CONFIG.authDir);
+        for (const file of files) {
+          if (file.startsWith('lid-mapping-') && !file.includes('_reverse')) {
+            const raw = fs.readFileSync(path.join(CONFIG.authDir, file), 'utf8');
+            try {
+              const parsedLid = JSON.parse(raw);
+              if (parsedLid === lidDigits || parsedLid === jid) {
+                const phoneCandidate = file.replace('lid-mapping-', '').replace('.json', '');
+                return phoneCandidate.replace(/\D/g, '');
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+
     return lidDigits;
   }
 
@@ -115,15 +133,36 @@ async function resolveSenderPhone(socket, jid, msg) {
 }
 
 /**
+ * Extracts plain text content from various Baileys message structures.
+ */
+function extractMessageText(messageContent) {
+  if (!messageContent) return '';
+
+  return (
+    messageContent.conversation ||
+    messageContent.extendedTextMessage?.text ||
+    messageContent.imageMessage?.caption ||
+    messageContent.videoMessage?.caption ||
+    messageContent.templateButtonReplyMessage?.selectedDisplayText ||
+    messageContent.templateButtonReplyMessage?.selectedId ||
+    messageContent.buttonsResponseMessage?.selectedDisplayText ||
+    messageContent.buttonsResponseMessage?.selectedButtonId ||
+    messageContent.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    messageContent.listResponseMessage?.title ||
+    ''
+  );
+}
+
+/**
  * Format phone for session_id: "wa_<digits>"
- * Compatible with backend SessionStore which accepts any non-empty string.
+ * Compatible with backend SessionStore which accepts any string session_id.
  */
 function phoneToSessionId(phone) {
   return `wa_${phone}`;
 }
 
 // ---------------------------------------------------------------------------
-// Structured Logging (no private message content)
+// Structured Logging (Safe: Zero PII, Zero Tokens, Zero Message Contents)
 // ---------------------------------------------------------------------------
 
 function log(event, data = {}) {
@@ -133,15 +172,18 @@ function log(event, data = {}) {
     whatsapp_event: event,
     ...data,
   };
-  // Never log message content or auth credentials
+  // Sanitize: Never log message content, auth credentials, or keys
   delete entry.content;
+  delete entry.text;
   delete entry.auth;
   delete entry.credentials;
+  delete entry.key;
+  delete entry.apikey;
   console.log(JSON.stringify(entry));
 }
 
 // ---------------------------------------------------------------------------
-// Per-Sender Rate Limiter (sliding window)
+// Per-Sender Rate Limiter (Sliding 1-minute window)
 // ---------------------------------------------------------------------------
 
 /** @type {Map<string, number[]>} phone → array of timestamps */
@@ -181,7 +223,7 @@ function checkRateLimit(phone) {
 // ---------------------------------------------------------------------------
 
 /**
- * Sends a chat request to the existing WeatherGPT /api/chat endpoint.
+ * Sends a chat request to the WeatherGPT /api/chat endpoint.
  * Returns the assistant's response text, or throws on failure.
  *
  * @param {string} messageText - The user's weather query
@@ -210,7 +252,7 @@ async function callWeatherGPTChat(messageText, sessionId) {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload),
       },
-      timeout: 60_000, // 60s — Gemini tool loops can take time
+      timeout: 60_000, // 60s — multi-turn tool loops can take time
     }, (res) => {
       let body = '';
       res.on('data', chunk => { body += chunk; });
@@ -228,11 +270,10 @@ async function callWeatherGPTChat(messageText, sessionId) {
             reject(new Error(`Failed to parse /api/chat response: ${e.message}`));
           }
         } else {
-          // Extract error type without leaking secrets
           let errorType = 'UnknownError';
           try {
             const errBody = JSON.parse(body);
-            errorType = errBody.error_type || `HTTP_${res.statusCode}`;
+            errorType = errBody.detail || errBody.error_type || `HTTP_${res.statusCode}`;
           } catch (_) {
             errorType = `HTTP_${res.statusCode}`;
           }
@@ -252,7 +293,7 @@ async function callWeatherGPTChat(messageText, sessionId) {
 }
 
 // ---------------------------------------------------------------------------
-// Subscriber Authorization Bridge
+// Subscriber Authorization Bridge (Live Supabase Lookup)
 // ---------------------------------------------------------------------------
 
 /**
@@ -265,7 +306,7 @@ function checkBackendSubscriber(phone) {
 
   return new Promise((resolve) => {
     const transport = url.protocol === 'https:' ? https : http;
-    const req = transport.request(url, { method: 'GET', timeout: 5000 }, (res) => {
+    const req = transport.request(url, { method: 'GET', timeout: 8000 }, (res) => {
       let body = '';
       res.on('data', chunk => { body += chunk; });
       res.on('end', () => {
@@ -318,9 +359,9 @@ async function isAuthorizedSender(phone) {
  */
 async function handleMessage(socket, msg) {
   // 1. Ignore own messages
-  if (msg.key.fromMe) return;
+  if (msg.key?.fromMe) return;
 
-  const jid = msg.key.remoteJid;
+  const jid = msg.key?.remoteJid;
   if (!jid) return;
 
   // 2. Ignore groups, broadcasts, status
@@ -329,75 +370,76 @@ async function handleMessage(socket, msg) {
     return;
   }
 
-  // 3. Extract text only (ignore media, stickers, etc.)
-  const text = msg.message?.conversation
-    || msg.message?.extendedTextMessage?.text
-    || '';
-
+  // 3. Extract text only (ignore media without captions, stickers, etc.)
+  const text = extractMessageText(msg.message);
   if (!text || !text.trim()) {
-    log('ignored', { reason: 'non_text_message', jid_suffix: jid.slice(-15) });
+    log('ignored', { reason: 'non_text_message', jid_suffix: jid.includes('@') ? '@' + jid.split('@')[1] : jid });
     return;
   }
+
+  const rawText = text.trim();
 
   // 4. Resolve sender phone number (handles both @s.whatsapp.net and privacy @lid)
   const phone = await resolveSenderPhone(socket, jid, msg);
+  const phoneSuffix = phone ? phone.slice(-4) : 'unknown';
 
-  // 5. Emergency Alert Subscription Authorization check
+  // 5. Emergency Alert Subscription Authorization check (Live against Supabase)
   const authFn = (module.exports && module.exports.isAuthorizedSender) ? module.exports.isAuthorizedSender : isAuthorizedSender;
   const authorized = await authFn(phone);
   if (!authorized) {
-    log('ignored', { reason: 'not_subscribed', phone_suffix: phone.slice(-4) });
+    // Unauthorized senders are silently ignored: 0 calls to /api/chat, 0 Gemini quota consumed
+    log('ignored', { reason: 'not_subscribed', phone_suffix: phoneSuffix });
     return;
   }
 
-  log('received', { phone_suffix: phone.slice(-4), message_length: text.length });
+  log('received', { phone_suffix: phoneSuffix, message_length: rawText.length });
 
-  // 6. Message length check — reject, do NOT truncate
-  if (text.length > CONFIG.maxMessageLen) {
-    log('ignored', { reason: 'message_too_long', length: text.length, limit: CONFIG.maxMessageLen });
+  // 6. Message length check — reject oversized messages, do NOT silently truncate
+  if (rawText.length > CONFIG.maxMessageLen) {
+    log('ignored', { reason: 'message_too_long', length: rawText.length, limit: CONFIG.maxMessageLen });
     try {
       await socket.sendMessage(jid, {
-        text: `⚠️ Your message is too long (${text.length} characters). Please keep it under ${CONFIG.maxMessageLen} characters and try again.`
+        text: `⚠️ Your message is too long (${rawText.length} characters). Please keep your weather question under ${CONFIG.maxMessageLen} characters.`
       });
-      log('send', { type: 'length_rejection', phone_suffix: phone.slice(-4) });
+      log('send', { type: 'length_rejection', phone_suffix: phoneSuffix });
     } catch (sendErr) {
       log('error', { reason: 'send_length_rejection_failed', error: sendErr.message });
     }
     return;
   }
 
-  // 7. Rate limit check
+  // 7. Rate limit check (Sliding window per sender)
   if (!checkRateLimit(phone)) {
-    log('ignored', { reason: 'rate_limited', phone_suffix: phone.slice(-4), limit: CONFIG.rateLimitPerMin });
+    log('ignored', { reason: 'rate_limited', phone_suffix: phoneSuffix, limit: CONFIG.rateLimitPerMin });
     try {
       await socket.sendMessage(jid, {
-        text: '⏳ You\'re sending messages too quickly. Please wait a minute before trying again.'
+        text: `⏳ You're sending messages too quickly. Please wait a minute before trying again (limit: ${CONFIG.rateLimitPerMin} messages/min).`
       });
+      log('send', { type: 'rate_limit_reply', phone_suffix: phoneSuffix });
     } catch (_) { /* best effort */ }
     return;
   }
 
-  // 8. Call /api/chat
+  // 8. Call WeatherGPT /api/chat
   const sessionId = phoneToSessionId(phone);
-  log('chat_request', { phone_suffix: phone.slice(-4), session_id: sessionId });
+  log('chat_request', { phone_suffix: phoneSuffix, session_id: sessionId });
 
   try {
     const chatFn = (module.exports && module.exports.callWeatherGPTChat) ? module.exports.callWeatherGPTChat : callWeatherGPTChat;
-    const response = await chatFn(text.trim(), sessionId);
-    log('chat_response', { phone_suffix: phone.slice(-4), response_length: response.length });
+    const response = await chatFn(rawText, sessionId);
+    log('chat_response', { phone_suffix: phoneSuffix, response_length: response.length });
 
     // 9. Send response back via WhatsApp
     await socket.sendMessage(jid, { text: response });
-    log('send', { type: 'chat_response', phone_suffix: phone.slice(-4) });
+    log('send', { type: 'chat_response', phone_suffix: phoneSuffix });
 
   } catch (err) {
-    // Single controlled error — no retry
-    log('error', { reason: 'chat_api_failed', error: err.message, phone_suffix: phone.slice(-4) });
+    log('error', { reason: 'chat_api_failed', error: err.message, phone_suffix: phoneSuffix });
     try {
       await socket.sendMessage(jid, {
         text: '🌧️ WeatherGPT is temporarily unable to process your request. Please try again in a moment.'
       });
-      log('send', { type: 'error_reply', phone_suffix: phone.slice(-4) });
+      log('send', { type: 'error_reply', phone_suffix: phoneSuffix });
     } catch (sendErr) {
       log('error', { reason: 'send_error_reply_failed', error: sendErr.message });
     }
@@ -405,16 +447,29 @@ async function handleMessage(socket, msg) {
 }
 
 // ---------------------------------------------------------------------------
-// Baileys Connection Manager
+// Baileys Connection Manager (Singleton / Reconnect Guard)
 // ---------------------------------------------------------------------------
 
+let activeSocket = null;
+let isConnecting = false;
 let reconnectAttempt = 0;
+let reconnectTimer = null;
 const MAX_RECONNECT_DELAY = 60_000; // 60 seconds
 
 async function connectToWhatsApp() {
+  if (isConnecting) {
+    log('connection_in_progress', { action: 'skipping_duplicate_connect' });
+    return;
+  }
+  isConnecting = true;
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+
   log('startup', { config: {
     enabled: CONFIG.enabled,
-    allowlist_count: CONFIG.allowedNumbers.size,
     rate_limit: CONFIG.rateLimitPerMin,
     max_message_len: CONFIG.maxMessageLen,
     api_url: CONFIG.apiUrl,
@@ -426,81 +481,96 @@ async function connectToWhatsApp() {
     fs.mkdirSync(CONFIG.authDir, { recursive: true });
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(CONFIG.authDir);
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(CONFIG.authDir);
 
-  const socket = makeWASocket({
-    auth: state,
-    printQRInTerminal: false,
-    logger: pino({ level: 'silent' }), // Suppress noisy Baileys internals
-  });
+    const socket = makeWASocket({
+      auth: state,
+      printQRInTerminal: false,
+      logger: pino({ level: 'silent' }), // Suppress internal Baileys logging
+    });
 
-  // Connection lifecycle
-  socket.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
+    activeSocket = socket;
 
-    if (qr) {
-      log('qr_generated', { action: 'scan_with_whatsapp' });
-      console.log('\n========================================');
-      console.log('  SCAN THIS QR CODE WITH WHATSAPP');
-      console.log('  Settings > Linked Devices > Link a Device');
-      console.log('========================================\n');
-      qrcode.generate(qr, { small: true });
-      console.log('');
-    }
+    // Connection lifecycle
+    socket.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
 
-    if (connection === 'open') {
-      reconnectAttempt = 0;
-      log('connected', { user_id: socket.user?.id ? '***authenticated***' : 'unknown' });
-    }
-
-    if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-
-      log('disconnected', {
-        status_code: statusCode,
-        logged_out: statusCode === DisconnectReason.loggedOut,
-        will_reconnect: shouldReconnect,
-      });
-
-      if (shouldReconnect) {
-        // Exponential backoff: 3s, 6s, 12s, 24s, 48s, 60s (capped)
-        const delay = Math.min(3000 * Math.pow(2, reconnectAttempt), MAX_RECONNECT_DELAY);
-        reconnectAttempt++;
-        log('reconnecting', { delay_ms: delay, attempt: reconnectAttempt });
-        setTimeout(() => connectToWhatsApp(), delay);
-      } else {
-        log('logged_out', { action: 'manual_re_authentication_required' });
-        process.exit(0);
+      if (qr) {
+        log('qr_generated', { action: 'scan_with_whatsapp' });
+        console.log('\n========================================');
+        console.log('  SCAN THIS QR CODE WITH WHATSAPP');
+        console.log('  Settings > Linked Devices > Link a Device');
+        console.log('========================================\n');
+        qrcode.generate(qr, { small: true });
+        console.log('');
       }
-    }
-  });
 
-  // Persist credentials on update
-  socket.ev.on('creds.update', saveCreds);
-
-  // Message handler
-  socket.ev.on('messages.upsert', async (m) => {
-    if (m.type !== 'notify') return;
-
-    for (const msg of m.messages) {
-      try {
-        await handleMessage(socket, msg);
-      } catch (err) {
-        log('error', { reason: 'unhandled_message_error', error: err.message });
+      if (connection === 'open') {
+        reconnectAttempt = 0;
+        isConnecting = false;
+        log('connected', { user_id: socket.user?.id ? '***authenticated***' : 'unknown' });
       }
-    }
-  });
+
+      if (connection === 'close') {
+        isConnecting = false;
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+        log('disconnected', {
+          status_code: statusCode,
+          logged_out: statusCode === DisconnectReason.loggedOut,
+          will_reconnect: shouldReconnect,
+        });
+
+        if (shouldReconnect) {
+          const delay = Math.min(3000 * Math.pow(2, reconnectAttempt), MAX_RECONNECT_DELAY);
+          reconnectAttempt++;
+          log('reconnecting', { delay_ms: delay, attempt: reconnectAttempt });
+          reconnectTimer = setTimeout(() => {
+            connectToWhatsApp();
+          }, delay);
+        } else {
+          log('logged_out', { action: 'manual_re_authentication_required' });
+          process.exit(0);
+        }
+      }
+    });
+
+    // Persist credentials on update
+    socket.ev.on('creds.update', saveCreds);
+
+    // Message handler
+    socket.ev.on('messages.upsert', async (m) => {
+      if (m.type !== 'notify') return;
+
+      for (const msg of m.messages) {
+        try {
+          await handleMessage(socket, msg);
+        } catch (err) {
+          log('error', { reason: 'unhandled_message_error', error: err.message });
+        }
+      }
+    });
+
+  } catch (err) {
+    isConnecting = false;
+    log('error', { reason: 'socket_creation_failed', error: err.message });
+    const delay = Math.min(3000 * Math.pow(2, reconnectAttempt), MAX_RECONNECT_DELAY);
+    reconnectAttempt++;
+    reconnectTimer = setTimeout(() => connectToWhatsApp(), delay);
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Exports for testing (must be before entry point guard)
+// Exports for Unit Testing
 // ---------------------------------------------------------------------------
 module.exports = {
   CONFIG,
-  parseAllowedNumbers,
+  normalizeDigits,
   jidToPhone,
   resolveSenderPhone,
+  extractMessageText,
   checkBackendSubscriber,
   isAuthorizedSender,
   phoneToSessionId,
@@ -509,22 +579,17 @@ module.exports = {
   handleMessage,
   rateLimitWindows,
   log,
+  connectToWhatsApp,
 };
 
 // ---------------------------------------------------------------------------
-// Entry Point (only when run directly, NOT when imported by tests)
+// Entry Point Guard (Only starts Baileys when executed directly, not when tested)
 // ---------------------------------------------------------------------------
 if (require.main === module) {
   if (!CONFIG.enabled) {
     log('disabled', { reason: 'WHATSAPP_BOT_ENABLED is false', action: 'exiting' });
     console.log('[WeatherGPT WhatsApp] Bot is DISABLED. Set WHATSAPP_BOT_ENABLED=true in whatsapp/.env to activate.');
     process.exit(0);
-  }
-
-  if (CONFIG.allowedNumbers.size === 0) {
-    log('error', { reason: 'no_allowed_numbers', action: 'exiting' });
-    console.error('[WeatherGPT WhatsApp] ERROR: WHATSAPP_ALLOWED_NUMBERS is empty. At least one number is required.');
-    process.exit(1);
   }
 
   connectToWhatsApp().catch((err) => {
