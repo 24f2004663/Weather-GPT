@@ -230,13 +230,49 @@ class NotificationOrchestrator:
             return False
 
     async def _is_rate_limited(self, recipient: str) -> bool:
+        """
+        Enforces maximum notifications per recipient per hour.
+        Prunes timestamps older than 3600s to prevent unbounded memory growth.
+        """
         now = time.time()
+        one_hour_ago = now - 3600.0
         max_limit = settings.MAX_NOTIFICATIONS_PER_RECIPIENT_PER_HOUR
+
         async with self._lock:
             timestamps = self._recipient_hourly_counts.get(recipient, [])
-            recent = [t for t in timestamps if now - t < 3600]
-            self._recipient_hourly_counts[recipient] = recent
-            return len(recent) >= max_limit
+            recent_timestamps = [ts for ts in timestamps if ts > one_hour_ago]
+            self._recipient_hourly_counts[recipient] = recent_timestamps
+            return len(recent_timestamps) >= max_limit
+
+    async def cleanup_expired_tracking(self) -> int:
+        """
+        Purges expired rate-limit tracking entries and old idempotency keys.
+        """
+        now = time.time()
+        one_hour_ago = now - 3600.0
+        one_day_ago = now - 86400.0
+        purged = 0
+
+        async with self._lock:
+            # Clean up recipient counts
+            empty_recipients = []
+            for recipient, timestamps in self._recipient_hourly_counts.items():
+                recent = [ts for ts in timestamps if ts > one_hour_ago]
+                if recent:
+                    self._recipient_hourly_counts[recipient] = recent
+                else:
+                    empty_recipients.append(recipient)
+            for r in empty_recipients:
+                del self._recipient_hourly_counts[r]
+                purged += 1
+
+            # Clean up idempotency keys older than 24h
+            expired_keys = [k for k, ts in self._sent_idempotency_keys.items() if ts < one_day_ago]
+            for k in expired_keys:
+                del self._sent_idempotency_keys[k]
+                purged += 1
+
+        return purged
 
     async def _record_dispatch(self, idempotency_key: str, recipient: str, record: NotificationRecord):
         now = time.time()

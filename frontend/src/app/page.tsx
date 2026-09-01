@@ -56,45 +56,40 @@ export default function HomePage() {
     setWeatherError(null);
     setAlertsError(null);
 
-    // 1. Load Real-Time & Forecast Weather
-    try {
-      const wRes = await getWeatherForecast(loc.latitude, loc.longitude, 7, true);
-      setWeatherData(wRes);
-    } catch (err: any) {
-      console.error('Failed to load weather:', err);
-      setWeatherError(err.message || 'Unable to retrieve weather data from backend.');
-    } finally {
-      setIsLoadingWeather(false);
-    }
+    // Execute real-time weather, historical climate, and disaster alerts concurrently
+    const [weatherResult, climateResult, alertsResult] = await Promise.allSettled([
+      getWeatherForecast(loc.latitude, loc.longitude, 7, true),
+      getHistoricalClimate(loc.latitude, loc.longitude),
+      fetchDisasterAlerts(loc.latitude, loc.longitude, loc.admin1, loc.name, true),
+    ]);
 
-    // 2. Load Climatological Historical Baseline
-    try {
-      const cRes = await getHistoricalClimate(loc.latitude, loc.longitude);
-      setClimateData(cRes);
-    } catch (err: any) {
-      console.error('Failed to load climate baseline:', err);
+    // 1. Process Weather
+    if (weatherResult.status === 'fulfilled') {
+      setWeatherData(weatherResult.value);
+    } else {
+      console.error('Failed to load weather:', weatherResult.reason);
+      setWeatherError(weatherResult.reason?.message || 'Unable to retrieve weather data from backend.');
+    }
+    setIsLoadingWeather(false);
+
+    // 2. Process Climatological Historical Baseline
+    if (climateResult.status === 'fulfilled') {
+      setClimateData(climateResult.value);
+    } else {
+      console.error('Failed to load climate baseline:', climateResult.reason);
       setClimateData(null);
-    } finally {
-      setIsLoadingClimate(false);
     }
+    setIsLoadingClimate(false);
 
-    // 3. Load Real-Time Official Disaster Alerts from SACHET/NDMA
-    try {
-      const aRes = await fetchDisasterAlerts(
-        loc.latitude,
-        loc.longitude,
-        loc.admin1,
-        loc.name,
-        true
-      );
-      setAlerts(aRes.alerts);
-    } catch (err: any) {
-      console.error('Failed to load disaster alerts:', err);
-      setAlertsError(err.message || 'Failed to refresh disaster alerts.');
+    // 3. Process Real-Time Official Disaster Alerts from SACHET/NDMA
+    if (alertsResult.status === 'fulfilled') {
+      setAlerts(alertsResult.value.alerts);
+    } else {
+      console.error('Failed to load disaster alerts:', alertsResult.reason);
+      setAlertsError(alertsResult.reason?.message || 'Failed to refresh disaster alerts.');
       setAlerts([]);
-    } finally {
-      setIsLoadingAlerts(false);
     }
+    setIsLoadingAlerts(false);
   }, []);
 
   useEffect(() => {

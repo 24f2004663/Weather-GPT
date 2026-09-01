@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "WeatherGPT"
     PROJECT_VERSION: str = "0.7.1"
     ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
-    DEBUG: bool = Field(default=True, env="DEBUG")
+    DEBUG: bool = Field(default=False, env="DEBUG")
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     PORT: int = Field(default=8000, env="PORT")
     FRONTEND_PORT: int = Field(default=3000, env="FRONTEND_PORT")
@@ -24,16 +24,17 @@ class Settings(BaseSettings):
         env="ALLOWED_ORIGINS"
     )
 
-    # HTTP Client Configuration
+    # HTTP Client Configuration & Timeouts
     HTTP_TIMEOUT_SECONDS: float = Field(default=30.0, env="HTTP_TIMEOUT_SECONDS")
-    HTTP_MAX_RETRIES: int = Field(default=2, env="HTTP_MAX_RETRIES")
+    NASA_POWER_TIMEOUT_SECONDS: float = Field(default=45.0, env="NASA_POWER_TIMEOUT_SECONDS")
 
     # Cache TTLs (in seconds)
     WEATHER_CACHE_TTL_SECONDS: int = Field(default=900, env="WEATHER_CACHE_TTL_SECONDS")       # 15 mins (fresh)
     WEATHER_STALE_CACHE_TTL_SECONDS: int = Field(default=7200, env="WEATHER_STALE_CACHE_TTL_SECONDS") # 2 hours (stale fallback)
     GEOCODING_CACHE_TTL_SECONDS: int = Field(default=86400, env="GEOCODING_CACHE_TTL_SECONDS")   # 24 hours
     CLIMATE_CACHE_TTL_SECONDS: int = Field(default=604800, env="CLIMATE_CACHE_TTL_SECONDS")    # 7 days
-    ALERT_CACHE_TTL_SECONDS: int = Field(default=300, env="ALERT_CACHE_TTL_SECONDS")          # 5 mins
+    ALERT_CACHE_TTL_SECONDS: int = Field(default=300, env="ALERT_CACHE_TTL_SECONDS")          # 5 mins (fresh)
+    ALERT_STALE_CACHE_TTL_SECONDS: int = Field(default=900, env="ALERT_STALE_CACHE_TTL_SECONDS") # 15 mins (stale fallback for emergencies)
 
 
     # Weather & Feed URLs

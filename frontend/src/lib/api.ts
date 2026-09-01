@@ -40,7 +40,7 @@ export async function fetchConfigStatus(): Promise<ConfigStatus | null> {
     const res = await fetch(`${API_BASE_URL}/api/config`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
+      cache: 'default',
     });
     if (!res.ok) {
       throw new Error(`Config fetch failed with status: ${res.status}`);
@@ -57,7 +57,7 @@ export async function searchLocations(query: string, count: number = 5): Promise
   const res = await fetch(url, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
-    cache: 'no-store',
+    cache: 'default',
   });
   if (!res.ok) {
     throw new Error(`Location search failed: HTTP ${res.status}`);
@@ -113,7 +113,7 @@ export async function getHistoricalClimate(lat: number, lon: number): Promise<Na
   const res = await fetch(url, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
-    cache: 'no-store',
+    cache: 'default',
   });
   if (!res.ok) {
     throw new Error(`Climate fetch failed: HTTP ${res.status}`);

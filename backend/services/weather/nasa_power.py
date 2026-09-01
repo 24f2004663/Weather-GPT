@@ -5,6 +5,7 @@ import httpx
 from backend.core.config import settings
 from backend.core.logging import logger
 from backend.core.cache import cache
+from backend.core.http_client import http_client_manager
 from backend.core.errors import (
     UpstreamProviderError,
     UpstreamTimeoutError,
@@ -23,10 +24,19 @@ PARAMETER_DESCRIPTIONS = {
     "WS10M": "Wind Speed at 10 Meters (m/s)"
 }
 
+def _make_nasa_cache_key(lat: float, lon: float) -> str:
+    """
+    Normalizes coordinates to 1 decimal place (~11.1 km).
+    NASA POWER Climatology uses a coarse 0.5° x 0.5° grid (~55 km).
+    1dp binning ensures points within the same municipal/district cluster reuse
+    identical 30-year climatological baselines without duplicate API calls.
+    """
+    return f"climate:nasa:{round(lat, 1):.1f}:{round(lon, 1):.1f}"
+
 class NasaPowerProvider:
     """
     NASA POWER Agroclimatology and Meteorology Provider for baseline climate insights.
-    Strictly used for historical climatology averages, not real-time forecasts.
+    Strictly used for historical 30-year climatology averages, not real-time forecasts.
     """
     def __init__(
         self,
@@ -34,7 +44,7 @@ class NasaPowerProvider:
         timeout: Optional[float] = None
     ):
         self.base_url = (base_url or settings.NASA_POWER_BASE_URL).rstrip("/")
-        self.timeout = timeout or settings.HTTP_TIMEOUT_SECONDS
+        self.timeout = timeout or settings.NASA_POWER_TIMEOUT_SECONDS
 
     async def get_climatology(
         self,
@@ -43,15 +53,16 @@ class NasaPowerProvider:
         location_meta: Optional[LocationResult] = None
     ) -> NasaPowerClimateResponse:
         """
-        Retrieves 30-year NASA POWER climatology averages for coordinates.
+        Retrieves 30-year NASA POWER climatology averages for coordinates with caching,
+        connection reuse, and stale-fallback resilience.
         """
         if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
             raise InvalidCoordinatesError(f"Coordinates ({lat}, {lon}) are out of valid range [-90..90, -180..180]")
 
-        cache_key = f"climate:nasa:{lat:.4f}:{lon:.4f}"
+        cache_key = _make_nasa_cache_key(lat, lon)
         cached_data = await cache.get(cache_key)
         if cached_data is not None:
-            logger.debug(f"Cache HIT for NASA POWER climate at ({lat}, {lon})")
+            logger.debug(f"[Cache HIT] NASA POWER climate at key={cache_key}")
             resp = NasaPowerClimateResponse(**cached_data)
             resp.cached = True
             return resp
@@ -65,17 +76,40 @@ class NasaPowerProvider:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(self.base_url, params=params)
+            client = await http_client_manager.get_client()
+            response = await client.get(self.base_url, params=params, timeout=self.timeout)
+
         except httpx.TimeoutException:
-            logger.error(f"Timeout fetching climatology from NASA POWER for ({lat}, {lon})")
+            logger.error(f"[Upstream timeout] NASA POWER for ({lat}, {lon}) after {self.timeout}s")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning(f"[Cache STALE FALLBACK] Returning stale NASA POWER data for {cache_key}")
+                resp = NasaPowerClimateResponse(**val)
+                resp.cached = True
+                return resp
             raise UpstreamTimeoutError(provider="NASA POWER", timeout_seconds=self.timeout)
+
         except Exception as e:
-            logger.error(f"Network error connecting to NASA POWER: {str(e)}")
+            logger.error(f"[Network error] NASA POWER: {str(e)}")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning(f"[Cache STALE FALLBACK] Returning stale NASA POWER data for {cache_key}")
+                resp = NasaPowerClimateResponse(**val)
+                resp.cached = True
+                return resp
             raise UpstreamProviderError(provider="NASA POWER", status_code=None, message=str(e))
 
         if response.status_code != 200:
-            logger.error(f"NASA POWER HTTP {response.status_code}: {response.text}")
+            logger.error(f"[Upstream {response.status_code}] NASA POWER: {response.text[:200]}")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning(f"[Cache STALE FALLBACK] Returning stale NASA POWER data for {cache_key}")
+                resp = NasaPowerClimateResponse(**val)
+                resp.cached = True
+                return resp
             raise UpstreamProviderError(
                 provider="NASA POWER",
                 status_code=response.status_code,
@@ -84,13 +118,18 @@ class NasaPowerProvider:
 
         try:
             raw = response.json()
-        except Exception as e:
+        except Exception:
             raise UpstreamProviderError(provider="NASA POWER", status_code=200, message="Malformed JSON response from NASA POWER")
 
         normalized = self._normalize_nasa_payload(raw, lat, lon, location_meta)
         
-        # Cache for configured long-term TTL
-        await cache.set(cache_key, normalized.dict(), ttl_seconds=settings.CLIMATE_CACHE_TTL_SECONDS)
+        # Cache for configured long-term TTL with 14-day stale window
+        await cache.set(
+            cache_key,
+            normalized.dict(),
+            ttl_seconds=settings.CLIMATE_CACHE_TTL_SECONDS,
+            stale_ttl_seconds=settings.CLIMATE_CACHE_TTL_SECONDS * 2
+        )
         return normalized
 
     def _normalize_nasa_payload(

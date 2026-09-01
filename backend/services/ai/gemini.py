@@ -1,11 +1,12 @@
 import time
 import json
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 import httpx
 
 from backend.core.config import settings
 from backend.core.logging import logger
+from backend.core.http_client import http_client_manager
 from backend.core.errors import (
     GeminiConfigMissingError,
     UpstreamProviderError,
@@ -23,7 +24,7 @@ class GeminiAIService(BaseAIService):
     """
     Production-grade Google Gemini AI Orchestration Layer.
     Implements structured function calling, bounded tool loops, session history,
-    strict input/output validation, and non-sensitive error boundaries.
+    connection pooling, in-turn tool call deduplication, and non-sensitive error boundaries.
     """
     def __init__(
         self,
@@ -52,19 +53,24 @@ class GeminiAIService(BaseAIService):
         # 2. Build conversation contents payload adhering to Gemini API protocol
         contents: List[Dict[str, Any]] = []
 
-        # Include prior session turns
-        for msg in history:
-            role = "user" if msg.role == "user" else "model"
-            contents.append({
-                "role": role,
-                "parts": [{"text": msg.content}]
-            })
+        if history:
+            # Server-side session store has active history
+            for msg in history:
+                role = "user" if msg.role == "user" else "model"
+                contents.append({
+                    "role": role,
+                    "parts": [{"text": msg.content}]
+                })
+            # Add latest incoming user message
+            active_turn_messages = request.messages[-1:] if request.messages else []
+        else:
+            # Fallback: server session expired or restarted, use client-provided bounded context
+            active_turn_messages = request.messages
 
-        # Include messages from the active request
-        for idx, msg in enumerate(request.messages):
+        for idx, msg in enumerate(active_turn_messages):
             role = "user" if msg.role == "user" else "model"
             # If coordinates or location hint provided on latest user message, inject as non-intrusive metadata header
-            if idx == len(request.messages) - 1 and msg.role == "user" and (request.user_location or request.coordinates):
+            if idx == len(active_turn_messages) - 1 and msg.role == "user" and (request.user_location or request.coordinates):
                 hints = []
                 if request.user_location:
                     hints.append(f"User Location Hint: {request.user_location}")
@@ -81,7 +87,7 @@ class GeminiAIService(BaseAIService):
                     "parts": [{"text": msg.content}]
                 })
 
-        clean_model = (self.model or "gemini-2.5-flash").replace("models/", "")
+        clean_model = (self.model or "gemini-3.5-flash").replace("models/", "")
         endpoint = f"{self.base_url}/models/{clean_model}:generateContent"
         headers = {
             "Content-Type": "application/json",
@@ -92,6 +98,11 @@ class GeminiAIService(BaseAIService):
         tools_used: List[str] = []
         tool_logs: List[ToolCallLog] = []
         referenced_weather_data: Dict[str, Any] = {}
+        
+        # Single-turn tool deduplication cache (tool_name, frozenset(args)) -> (result, provider)
+        turn_tool_cache: Dict[Tuple[str, Tuple], Tuple[Dict[str, Any], str]] = {}
+
+        client = await http_client_manager.get_client()
 
         # 3. Controlled Tool Calling Execution Loop
         for iteration in range(self.max_tool_iterations):
@@ -108,8 +119,7 @@ class GeminiAIService(BaseAIService):
             }
 
             try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.post(endpoint, headers=headers, json=body)
+                response = await client.post(endpoint, headers=headers, json=body, timeout=self.timeout)
             except httpx.TimeoutException:
                 logger.error(f"Gemini API request timed out after {self.timeout}s on iteration {iteration}")
                 raise UpstreamTimeoutError(provider="Gemini API", timeout_seconds=self.timeout)
@@ -118,7 +128,7 @@ class GeminiAIService(BaseAIService):
                 raise UpstreamProviderError(provider="Gemini API", status_code=None, message=str(e))
 
             if response.status_code != 200:
-                logger.error(f"Gemini API HTTP {response.status_code}: {response.text}")
+                logger.error(f"Gemini API HTTP {response.status_code}: {response.text[:200]}")
                 raise UpstreamProviderError(
                     provider="Gemini API",
                     status_code=response.status_code,
@@ -127,12 +137,11 @@ class GeminiAIService(BaseAIService):
 
             try:
                 resp_json = response.json()
-            except Exception as e:
+            except Exception:
                 raise UpstreamProviderError(provider="Gemini API", status_code=200, message="Malformed JSON response from Gemini API")
 
             candidates = resp_json.get("candidates") or []
             if not candidates:
-                # Check for prompt-level blockage
                 prompt_feedback = resp_json.get("promptFeedback", {})
                 block_reason = prompt_feedback.get("blockReason")
                 if block_reason:
@@ -168,7 +177,7 @@ class GeminiAIService(BaseAIService):
             function_calls = [p["functionCall"] for p in parts if "functionCall" in p]
 
             if not function_calls:
-                # Terminal text response reached!
+                # Terminal text response reached
                 text_parts = [p.get("text", "") for p in parts if "text" in p]
                 assistant_text = "".join(text_parts).strip()
 
@@ -185,8 +194,9 @@ class GeminiAIService(BaseAIService):
                 )
 
                 # Persist turn into session store
-                user_turn = request.messages[-1]
-                await session_store.append_messages(session_id, [user_turn, response_message])
+                if request.messages:
+                    user_turn = request.messages[-1]
+                    await session_store.append_messages(session_id, [user_turn, response_message])
 
                 return ChatResponse(
                     response_message=response_message,
@@ -202,7 +212,7 @@ class GeminiAIService(BaseAIService):
                 "parts": parts
             })
 
-            # Execute each function call and gather responses in sequence
+            # Execute function calls with in-turn deduplication
             function_response_parts: List[Dict[str, Any]] = []
             for fc in function_calls:
                 tool_name = fc.get("name", "")
@@ -210,13 +220,22 @@ class GeminiAIService(BaseAIService):
                 t_start = time.time()
 
                 tools_used.append(tool_name)
-                tool_result, provider_name = await execute_weather_tool(tool_name, raw_args)
+                
+                # Normalize arguments for deduplication key
+                arg_key = (tool_name, tuple(sorted((k, str(v)) for k, v in raw_args.items())))
+                
+                if arg_key in turn_tool_cache:
+                    tool_result, provider_name = turn_tool_cache[arg_key]
+                    logger.debug(f"[Tool DEDUP] Reusing in-turn result for {tool_name}")
+                else:
+                    tool_result, provider_name = await execute_weather_tool(tool_name, raw_args)
+                    turn_tool_cache[arg_key] = (tool_result, provider_name)
+
                 exec_time = (time.time() - t_start) * 1000
 
                 status_flag = tool_result.get("status", "success")
                 if status_flag == "success":
                     sources_used.add(provider_name)
-                    # Accumulate structured payload
                     if "data" in tool_result:
                         referenced_weather_data[tool_name] = tool_result["data"]
                     elif "locations" in tool_result:
@@ -229,7 +248,6 @@ class GeminiAIService(BaseAIService):
                     execution_time_ms=exec_time
                 ))
 
-                # Standard Gemini API v1beta functionResponse structure
                 safe_tool_result = json.loads(json.dumps(tool_result, default=str))
                 function_response_parts.append({
                     "functionResponse": {
@@ -241,13 +259,11 @@ class GeminiAIService(BaseAIService):
                     }
                 })
 
-            # Append function response turn to contents adhering to Gemini API protocol
             contents.append({
                 "role": "user",
                 "parts": function_response_parts
             })
 
-        # If loop reached max iterations without a terminal text response:
         attributions = sorted(list(sources_used)) if sources_used else ["Gemini AI"]
         fallback_msg = ChatMessage(
             role="assistant",

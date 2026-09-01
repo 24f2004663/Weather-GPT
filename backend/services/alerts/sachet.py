@@ -8,6 +8,7 @@ import httpx
 from backend.core.config import settings
 from backend.core.logging import logger
 from backend.core.cache import cache
+from backend.core.http_client import http_client_manager
 from backend.core.errors import (
     UpstreamProviderError,
     UpstreamTimeoutError,
@@ -50,27 +51,45 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
 
     async def fetch_active_alerts(self, force_refresh: bool = False) -> List[DisasterAlert]:
         """
-        Fetches, parses, deduplicates, and caches disaster alerts from SACHET/NDMA.
+        Fetches, parses, deduplicates, and caches disaster alerts from SACHET/NDMA
+        with strict 15-minute maximum emergency staleness policy.
         """
         cache_key = "sachet:alerts:all"
         if not force_refresh:
             cached_data = await cache.get(cache_key)
             if cached_data is not None:
-                logger.debug("Cache HIT for SACHET/NDMA disaster alerts")
+                logger.debug("[Cache HIT] SACHET/NDMA disaster alerts")
                 return [DisasterAlert(**item) for item in cached_data]
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(self.feed_url)
+            client = await http_client_manager.get_client()
+            response = await client.get(self.feed_url, timeout=self.timeout)
+
         except httpx.TimeoutException:
-            logger.error(f"Timeout connecting to SACHET/NDMA feed at {self.feed_url}")
+            logger.error(f"[Upstream timeout] SACHET/NDMA feed at {self.feed_url}")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning("[Cache STALE FALLBACK] Serving recent alerts within 15-minute emergency window")
+                return [DisasterAlert(**item) for item in val]
             raise UpstreamTimeoutError(provider="SACHET/NDMA Feed", timeout_seconds=self.timeout)
+
         except Exception as e:
-            logger.error(f"Network error connecting to SACHET/NDMA: {str(e)}")
+            logger.error(f"[Network error] SACHET/NDMA: {str(e)}")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning("[Cache STALE FALLBACK] Serving recent alerts within 15-minute emergency window")
+                return [DisasterAlert(**item) for item in val]
             raise UpstreamProviderError(provider="SACHET/NDMA Feed", status_code=None, message=str(e))
 
         if response.status_code != 200:
-            logger.error(f"SACHET/NDMA Feed HTTP {response.status_code}: {response.text}")
+            logger.error(f"[Upstream {response.status_code}] SACHET/NDMA Feed: {response.text[:200]}")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning("[Cache STALE FALLBACK] Serving recent alerts within 15-minute emergency window")
+                return [DisasterAlert(**item) for item in val]
             raise UpstreamProviderError(
                 provider="SACHET/NDMA Feed",
                 status_code=response.status_code,
@@ -80,8 +99,13 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
         raw_xml = response.text
         alerts = self.parse_feed_xml(raw_xml)
 
-        # Cache normalized alerts
-        await cache.set(cache_key, [a.dict() for a in alerts], ttl_seconds=settings.ALERT_CACHE_TTL_SECONDS)
+        # Cache with fresh TTL (5 min) and bounded emergency stale TTL (15 min)
+        await cache.set(
+            cache_key,
+            [a.dict() for a in alerts],
+            ttl_seconds=settings.ALERT_CACHE_TTL_SECONDS,
+            stale_ttl_seconds=settings.ALERT_STALE_CACHE_TTL_SECONDS
+        )
         return alerts
 
     def parse_feed_xml(self, xml_content: str) -> List[DisasterAlert]:
@@ -112,7 +136,6 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
         # Check for CAP <alert> or RSS <item> / Atom <entry>
         items = root.findall(".//item") or root.findall(".//atom:entry", ns) or root.findall(".//entry")
         if not items and root.tag.endswith("alert"):
-            # Root is a single CAP alert
             items = [root]
 
         for item in items:
@@ -126,11 +149,9 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
     def _parse_single_item(self, elem: ET.Element, ns: Dict[str, str], now: datetime) -> Optional[DisasterAlert]:
         """Parses an individual XML element into a DisasterAlert."""
         def get_text(tag_name: str, fallback: str = "") -> str:
-            # Try with namespace
             node = elem.find(f"cap:{tag_name}", ns) or elem.find(tag_name)
             if node is not None and node.text:
                 return node.text.strip()
-            # Search children recursively
             for child in elem.iter():
                 if child.tag.endswith(tag_name) and child.text:
                     return child.text.strip()
@@ -143,7 +164,6 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
         pub_date_str = get_text("pubDate") or get_text("sent") or get_text("effective")
 
         if not guid:
-            # Fallback deterministic fingerprint
             guid_seed = f"{title}:{description}:{pub_date_str}"
             guid = "sachet-" + hashlib.sha256(guid_seed.encode("utf-8")).hexdigest()[:16]
 
@@ -279,12 +299,10 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
         if not date_str:
             return None
         date_str = date_str.strip()
-        # 1. Try ISO 8601
         try:
             return datetime.fromisoformat(date_str)
         except Exception:
             pass
-        # 2. Try RFC 2822
         try:
             return parsedate_to_datetime(date_str)
         except Exception:
@@ -300,7 +318,6 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
                 states_found.append(s)
 
         districts_found: List[str] = []
-        # Common key coastal/metropolitan districts in India
         known_districts = [
             "Chennai", "Tiruvallur", "Kanchipuram", "Chengalpattu", "Cuddalore",
             "Nagapattinam", "Coimbatore", "Madurai", "Mumbai", "Thane", "Raigad",
@@ -340,14 +357,12 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
             if active_only and not alert.is_active:
                 continue
 
-            # If no location filters supplied, include alert
             if not state and not district and lat is None:
                 filtered.append(alert)
                 continue
 
             matched = False
 
-            # 1. District matching (highest precision)
             if district:
                 d_clean = district.strip().lower()
                 if any(d_clean in d.lower() for d in alert.affected_districts):
@@ -355,7 +370,6 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
                 elif d_clean in alert.affected_area.lower() or d_clean in alert.description.lower():
                     matched = True
 
-            # 2. State matching
             if not matched and state:
                 s_clean = state.strip().lower()
                 if any(s_clean in s.lower() for s in alert.affected_states):
@@ -363,7 +377,6 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
                 elif s_clean in alert.affected_area.lower() or s_clean in alert.description.lower():
                     matched = True
 
-            # 3. National-scope matching
             if not matched and alert.scope == GeographicScope.NATIONAL:
                 matched = True
 

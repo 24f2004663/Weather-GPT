@@ -7,6 +7,7 @@ import httpx
 from backend.core.config import settings
 from backend.core.logging import logger
 from backend.core.cache import cache
+from backend.core.http_client import http_client_manager
 from backend.core.errors import (
     LocationNotFoundError,
     UpstreamProviderError,
@@ -26,7 +27,7 @@ from backend.schemas.weather import (
 # ---------------------------------------------------------------------------
 # In-flight deduplication registry
 # Prevents concurrent identical requests from all hitting Open-Meteo at once.
-# Scoped to the current process — does not deduplicate across Render workers.
+# Scoped to the current process.
 # ---------------------------------------------------------------------------
 _inflight_weather: Dict[str, asyncio.Event] = {}
 
@@ -34,9 +35,8 @@ _inflight_weather: Dict[str, asyncio.Event] = {}
 def _normalize_coord(value: float, decimals: int = 2) -> float:
     """
     Round a coordinate to `decimals` decimal places for cache-key generation.
-    2 dp ≈ 1.1 km — sufficient for weather; merges dashboard coords (e.g. 13.0827)
-    with Open-Meteo geocoding results (e.g. 13.0878) for the same city.
-    Full-precision coordinates are still sent to Open-Meteo for accurate data.
+    2 dp ≈ 1.1 km — merges dashboard coords (e.g. 13.0827) with Open-Meteo
+    geocoding results (e.g. 13.0878) for the same city.
     """
     return round(value, decimals)
 
@@ -51,18 +51,14 @@ class OpenMeteoProvider(BaseWeatherProvider):
     Production-ready Open-Meteo Weather and Geocoding Provider.
 
     Features:
+    - Persistent HTTP connection pooling across requests
     - 15-minute fresh cache with 2-hour stale fallback
-    - 2dp coordinate normalization: dashboard and Gemini tool calls for the same
-      city converge to the same cache key despite minor coordinate differences
-    - Subset reuse: a cached 7-day+hourly payload satisfies smaller requests
-      (e.g. get_current_weather) without an additional Open-Meteo call
-    - In-flight deduplication: concurrent requests for the same cache key share
-      one upstream call
-    - Explicit HTTP 429 handling with stale fallback
-    - No aggressive retry on 429 (respects rate limits)
-
-    LIMITATION: The in-memory cache is process-local and is lost on every
-    Render cold start, deployment, or process restart.
+    - 2dp coordinate normalization: merges coordinate variations for same location
+    - Canonical geocoding caching: count=1 and count=5 share identical geocoding entry
+    - Stale geocoding fallback on upstream failure
+    - Subset reuse: cached 7-day+hourly payload satisfies current-weather and shorter requests
+    - In-flight deduplication: concurrent requests share a single upstream request
+    - Explicit HTTP 429 handling with zero aggressive retry
     """
 
     def __init__(
@@ -82,37 +78,58 @@ class OpenMeteoProvider(BaseWeatherProvider):
     async def resolve_location(self, query: str, count: int = 5) -> List[LocationResult]:
         """
         Geocodes a place query to a list of normalized LocationResult models.
-        Results are cached for 24 hours (geocoding is stable).
+        Normalized cache key is query-based so count=1 and count=5 share the same entry.
+        Results are cached for 24 hours with stale fallback.
         """
         clean_query = query.strip()
         if not clean_query:
             return []
 
-        cache_key = f"geo:{clean_query.lower()}:{count}"
+        cache_key = f"geo:{clean_query.lower()}"
         cached_data = await cache.get(cache_key)
         if cached_data is not None:
-            logger.debug(f"[Cache HIT] Geocoding: '{clean_query}'")
-            return [LocationResult(**item) for item in cached_data]
+            logger.debug(f"[Cache HIT] Geocoding: '{clean_query}' (request count={count})")
+            results = [LocationResult(**item) for item in cached_data]
+            return results[:count]
 
+        # Fetch up to 10 candidate matches so cache entry satisfies future higher-count queries
+        fetch_count = max(count, 10)
         params = {
             "name": clean_query,
-            "count": count,
+            "count": fetch_count,
             "language": "en",
             "format": "json"
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(self.geocoding_url, params=params)
+            client = await http_client_manager.get_client()
+            response = await client.get(self.geocoding_url, params=params, timeout=self.timeout)
+
         except httpx.TimeoutException:
             logger.error(f"[Upstream timeout] Open-Meteo Geocoding for '{clean_query}'")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning(f"[Cache STALE FALLBACK] Geocoding for '{clean_query}'")
+                return [LocationResult(**item) for item in val][:count]
             raise UpstreamTimeoutError(provider="Open-Meteo Geocoding", timeout_seconds=self.timeout)
+
         except Exception as e:
             logger.error(f"[Network error] Open-Meteo Geocoding for '{clean_query}': {e}")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning(f"[Cache STALE FALLBACK] Geocoding for '{clean_query}'")
+                return [LocationResult(**item) for item in val][:count]
             raise UpstreamProviderError(provider="Open-Meteo Geocoding", status_code=None, message=str(e))
 
         if response.status_code != 200:
             logger.error(f"[Upstream {response.status_code}] Open-Meteo Geocoding: {response.text[:200]}")
+            stale_entry = await cache.get_with_stale(cache_key)
+            if stale_entry is not None:
+                val, _ = stale_entry
+                logger.warning(f"[Cache STALE FALLBACK] Geocoding for '{clean_query}'")
+                return [LocationResult(**item) for item in val][:count]
             raise UpstreamProviderError(
                 provider="Open-Meteo Geocoding",
                 status_code=response.status_code,
@@ -144,17 +161,17 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 population=item.get("population"),
             ))
 
-        logger.info(f"[Provider request] Open-Meteo Geocoding '{clean_query}' → {len(normalized_results)} results")
+        logger.info(f"[Provider request] Open-Meteo Geocoding '{clean_query}' -> {len(normalized_results)} results")
         await cache.set(
             cache_key,
             [item.dict() for item in normalized_results],
             ttl_seconds=settings.GEOCODING_CACHE_TTL_SECONDS,
             stale_ttl_seconds=settings.GEOCODING_CACHE_TTL_SECONDS * 2
         )
-        return normalized_results
+        return normalized_results[:count]
 
     # ------------------------------------------------------------------
-    # Current weather (convenience wrapper)
+    # Current weather (convenience wrapper with subset reuse)
     # ------------------------------------------------------------------
 
     async def get_current_weather(
@@ -163,8 +180,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
     ) -> NormalizedWeatherResponse:
         """
         Fetches current weather conditions.
-        First attempts to reuse a cached 7-day+hourly payload (subset reuse)
-        before making a new Open-Meteo request.
+        Transparently satisfied from cached 7-day+hourly forecast payload where available.
         """
         return await self.get_forecast(lat=lat, lon=lon, days=1, include_hourly=False, location_meta=location_meta)
 
@@ -182,25 +198,15 @@ class OpenMeteoProvider(BaseWeatherProvider):
     ) -> NormalizedWeatherResponse:
         """
         Fetches current conditions, daily forecast, and optional hourly forecast.
-
-        Cache strategy:
-        1. Fresh cache hit → return immediately (no provider call)
-        2. Subset reuse: if requesting days<7 or no-hourly, check 7-day+hourly cache
-        3. In-flight deduplication → wait for concurrent request, serve from cache
-        4. Fresh provider request → cache result with fresh+stale TTLs
-        5. On 429/5xx/timeout → stale fallback (fresh or superset key), then raise
         """
         if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
             raise InvalidCoordinatesError(f"Coordinates ({lat}, {lon}) are out of valid range [-90..90, -180..180]")
 
         days_clamped = max(1, min(days, 16))
         cache_key = _make_weather_cache_key(lat, lon, days_clamped, include_hourly)
-        # The canonical "large" cache key: 7-day + hourly (most data)
         canonical_key = _make_weather_cache_key(lat, lon, 7, True)
 
-        # ------------------------------------------------------------------
         # 1. Fresh cache hit
-        # ------------------------------------------------------------------
         cached_data = await cache.get(cache_key)
         if cached_data is not None:
             logger.info(f"[Cache HIT fresh] ({lat},{lon}) days={days_clamped} hourly={include_hourly}")
@@ -208,10 +214,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
             resp.cached = True
             return resp
 
-        # ------------------------------------------------------------------
         # 2. Subset reuse: serve from canonical 7-day+hourly cache
-        #    if this request is for fewer days or no-hourly
-        # ------------------------------------------------------------------
         if cache_key != canonical_key:
             canonical_data = await cache.get(canonical_key)
             if canonical_data is not None:
@@ -220,7 +223,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     f"from cached 7d+hourly payload"
                 )
                 resp = NormalizedWeatherResponse(**canonical_data)
-                # Trim to requested scope
                 if days_clamped < len(resp.daily):
                     resp.daily = resp.daily[:days_clamped]
                 if not include_hourly:
@@ -228,22 +230,19 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 resp.cached = True
                 return resp
 
-        # ------------------------------------------------------------------
         # 3. In-flight deduplication
-        # ------------------------------------------------------------------
         if cache_key in _inflight_weather:
             logger.debug(f"[In-flight JOINED] ({lat},{lon}) waiting for concurrent request")
             try:
                 await asyncio.wait_for(_inflight_weather[cache_key].wait(), timeout=35.0)
             except asyncio.TimeoutError:
                 logger.warning(f"[In-flight JOINED timeout] ({lat},{lon}) — proceeding independently")
-            # Attempt to serve from cache after waiting
+            
             cached_data = await cache.get(cache_key)
             if cached_data is not None:
                 resp = NormalizedWeatherResponse(**cached_data)
                 resp.cached = True
                 return resp
-            # Also try canonical
             if cache_key != canonical_key:
                 canonical_data = await cache.get(canonical_key)
                 if canonical_data is not None:
@@ -255,15 +254,10 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     resp.cached = True
                     return resp
 
-        # ------------------------------------------------------------------
-        # Register in-flight event
-        # ------------------------------------------------------------------
         inflight_event = asyncio.Event()
         _inflight_weather[cache_key] = inflight_event
 
-        # ------------------------------------------------------------------
         # 4. Build and execute provider request
-        # ------------------------------------------------------------------
         hourly_vars = [
             "temperature_2m",
             "relativehumidity_2m",
@@ -308,8 +302,8 @@ class OpenMeteoProvider(BaseWeatherProvider):
         try:
             try:
                 logger.info(f"[Provider request] Open-Meteo forecast ({lat},{lon}) days={days_clamped} hourly={include_hourly}")
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.get(endpoint, params=params)
+                client = await http_client_manager.get_client()
+                response = await client.get(endpoint, params=params, timeout=self.timeout)
 
             except httpx.TimeoutException:
                 logger.error(f"[Upstream timeout] Open-Meteo forecast ({lat},{lon}) after {self.timeout}s")
@@ -325,7 +319,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     return stale
                 raise UpstreamProviderError(provider="Open-Meteo Forecast", status_code=None, message=str(e))
 
-            # ---- Explicit 429 handling -----------------------------------------------
             if response.status_code == 429:
                 retry_after = response.headers.get("Retry-After", "unknown")
                 logger.warning(
@@ -335,7 +328,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, "429 rate-limit")
                 if stale is not None:
                     return stale
-                # No cache available — surface as UpstreamProviderError with status 429
                 raise UpstreamProviderError(
                     provider="Open-Meteo Forecast",
                     status_code=429,
@@ -345,7 +337,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     )
                 )
 
-            if response.status_code not in (200,):
+            if response.status_code != 200:
                 logger.error(f"[Upstream {response.status_code}] Open-Meteo forecast ({lat},{lon}): {response.text[:200]}")
                 stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, f"HTTP {response.status_code}")
                 if stale is not None:
@@ -366,7 +358,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
 
             normalized = self._normalize_open_meteo_payload(raw, lat, lon, location_meta)
 
-            # Cache with both fresh (15 min) and stale (2 hr) TTLs
             await cache.set(
                 cache_key,
                 normalized.dict(),
@@ -380,14 +371,9 @@ class OpenMeteoProvider(BaseWeatherProvider):
             return normalized
 
         finally:
-            # Always release the in-flight lock so waiting coroutines can proceed
             if cache_key in _inflight_weather:
                 _inflight_weather[cache_key].set()
                 del _inflight_weather[cache_key]
-
-    # ------------------------------------------------------------------
-    # Stale cache helper
-    # ------------------------------------------------------------------
 
     async def _try_stale(
         self,
@@ -397,12 +383,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
         include_hourly: bool,
         reason: str
     ) -> Optional[NormalizedWeatherResponse]:
-        """
-        Attempt to serve from stale cache after an upstream failure.
-        Checks exact key first, then canonical 7-day superset.
-        Returns NormalizedWeatherResponse with stale=True, or None if unavailable.
-        """
-        # Exact key stale check
         stale_entry = await cache.get_with_stale(cache_key)
         if stale_entry is not None:
             value, is_stale = stale_entry
@@ -413,13 +393,11 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 resp.stale = True
                 return resp
             else:
-                # Fresh data available (shouldn't normally reach here, but handle it)
                 logger.info(f"[Cache HIT fresh (stale-path)] key={cache_key}")
                 resp = NormalizedWeatherResponse(**value)
                 resp.cached = True
                 return resp
 
-        # Canonical superset stale check
         if cache_key != canonical_key:
             stale_canonical = await cache.get_with_stale(canonical_key)
             if stale_canonical is not None:
@@ -440,10 +418,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
         logger.error(f"[No cache available] ({reason}) for key={cache_key} — returning None")
         return None
 
-    # ------------------------------------------------------------------
-    # Response normalization
-    # ------------------------------------------------------------------
-
     def _normalize_open_meteo_payload(
         self,
         raw: Dict[str, Any],
@@ -451,10 +425,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
         lon: float,
         location_meta: Optional[LocationResult]
     ) -> NormalizedWeatherResponse:
-        """
-        Normalizes raw Open-Meteo API response into the WeatherGPT contract.
-        Preserves explicit None/null semantics where fields are not provided.
-        """
         tz = raw.get("timezone", "UTC")
         elevation = raw.get("elevation")
 
@@ -466,7 +436,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
             elevation=elevation
         )
 
-        # Current weather
         cw_raw = raw.get("current_weather") or {}
         w_code = int(cw_raw.get("weathercode", 0))
         cond_name, _, icon_key = decode_wmo_code(w_code)
@@ -490,7 +459,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
             observed_time=datetime.utcnow()
         )
 
-        # Hourly forecast
         hourly_list: List[HourlyForecast] = []
         h_raw = raw.get("hourly")
         if h_raw and "time" in h_raw:
@@ -528,7 +496,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     uv_index=float(uvs[idx]) if idx < len(uvs) and uvs[idx] is not None else None,
                 ))
 
-        # Daily forecast
         daily_list: List[DailyForecast] = []
         d_raw = raw.get("daily")
         if d_raw and "time" in d_raw:

@@ -51,6 +51,24 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
     };
   }, []);
 
+  const getSupportedAudioMime = (): { mimeType: string; extension: string } => {
+    if (typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined') {
+      const candidates = [
+        { mimeType: 'audio/webm;codecs=opus', extension: 'webm' },
+        { mimeType: 'audio/webm', extension: 'webm' },
+        { mimeType: 'audio/mp4', extension: 'mp4' },
+        { mimeType: 'audio/aac', extension: 'aac' },
+        { mimeType: 'audio/ogg', extension: 'ogg' },
+      ];
+      for (const cand of candidates) {
+        if (MediaRecorder.isTypeSupported(cand.mimeType)) {
+          return cand;
+        }
+      }
+    }
+    return { mimeType: 'audio/webm', extension: 'webm' };
+  };
+
   const handleSend = async (promptToSend?: string) => {
     const text = promptToSend || inputPrompt;
     if (!text.trim() || isLoading) return;
@@ -67,8 +85,13 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
     setIsLoading(true);
 
     try {
+      // Send bounded recent context (last 6 messages). If backend session is active,
+      // backend will use server-side session history; if backend restarted/expired,
+      // this bounded context provides immediate conversational continuity without unbounded payload growth.
+      const payloadMessages = updatedMessages.slice(-6);
+
       const res: ChatResponse = await sendChatMessage({
-        messages: updatedMessages,
+        messages: payloadMessages,
         user_location: selectedLocation?.name,
         coordinates: selectedLocation
           ? { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }
@@ -120,7 +143,7 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
     setReferencedData(null);
   };
 
-  // --- Voice Input (STT via Backend Groq Whisper) ---
+  // --- Voice Input (STT via Backend Groq Whisper with Safari/iOS MIME compatibility) ---
   const handleStartRecording = async () => {
     setVoiceError(null);
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -131,7 +154,10 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      const { mimeType } = getSupportedAudioMime();
+      const options = mimeType ? { mimeType } : undefined;
+      const mediaRecorder = options ? new MediaRecorder(stream, options) : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (e) => {
@@ -142,8 +168,9 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await handleTranscribeBlob(audioBlob);
+        const chosen = getSupportedAudioMime();
+        const audioBlob = new Blob(audioChunksRef.current, { type: chosen.mimeType || 'audio/webm' });
+        await handleTranscribeBlob(audioBlob, chosen.extension);
       };
 
       mediaRecorder.start();
@@ -160,12 +187,12 @@ export default function ChatPanel({ selectedLocation, currentLanguage = 'en' }: 
     }
   };
 
-  const handleTranscribeBlob = async (blob: Blob) => {
+  const handleTranscribeBlob = async (blob: Blob, ext: string = 'webm') => {
     setIsTranscribing(true);
     setVoiceError(null);
     try {
       const formData = new FormData();
-      formData.append('file', blob, 'recording.webm');
+      formData.append('file', blob, `recording.${ext}`);
       formData.append('language', currentLanguage);
 
       const data = await transcribeAudio(formData);

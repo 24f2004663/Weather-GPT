@@ -5,11 +5,14 @@ import httpx
 
 from backend.core.config import settings
 from backend.core.logging import logger
+from backend.core.http_client import http_client_manager
 from backend.core.errors import (
     WeatherGPTError,
     UpstreamProviderError,
     UpstreamTimeoutError,
 )
+
+MAX_AUDIO_BYTES = 25 * 1024 * 1024  # 25 MB Groq Whisper maximum
 
 class GroqConfigMissingError(WeatherGPTError):
     """Raised when Groq API key is required for transcription but not configured."""
@@ -32,7 +35,7 @@ _DEFAULT = object()
 class GroqWhisperService(BaseSTTService):
     """
     High-Speed Speech-to-Text using Groq Whisper API (whisper-large-v3).
-    Supports multilingual voice transcription with strict error boundaries.
+    Supports multilingual voice transcription with strict error boundaries and connection pooling.
     """
     def __init__(
         self,
@@ -59,6 +62,10 @@ class GroqWhisperService(BaseSTTService):
         if not audio_bytes or len(audio_bytes) == 0:
             raise WeatherGPTError("Audio buffer is empty or corrupted.")
 
+        if len(audio_bytes) > MAX_AUDIO_BYTES:
+            logger.warning(f"Audio upload exceeds 25MB limit: {len(audio_bytes)} bytes")
+            raise WeatherGPTError("Audio file exceeds maximum size of 25MB supported by speech recognition.")
+
         start_time = time.time()
         headers = {
             "Authorization": f"Bearer {self.api_key}"
@@ -77,13 +84,14 @@ class GroqWhisperService(BaseSTTService):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.endpoint,
-                    headers=headers,
-                    data=data,
-                    files=files
-                )
+            client = await http_client_manager.get_client()
+            response = await client.post(
+                self.endpoint,
+                headers=headers,
+                data=data,
+                files=files,
+                timeout=self.timeout
+            )
         except httpx.TimeoutException:
             logger.error(f"Groq Whisper transcription timed out after {self.timeout}s")
             raise UpstreamTimeoutError(provider="Groq Whisper", timeout_seconds=self.timeout)
@@ -101,7 +109,7 @@ class GroqWhisperService(BaseSTTService):
 
         try:
             result = response.json()
-        except Exception as e:
+        except Exception:
             raise UpstreamProviderError(provider="Groq Whisper", status_code=200, message="Malformed JSON response from Groq API")
 
         transcription_text = result.get("text", "").strip()
