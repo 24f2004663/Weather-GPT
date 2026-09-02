@@ -329,12 +329,15 @@ export default function NotificationSettingsModal({
                   <div className="pt-2 border-t border-slate-900 space-y-2">
                     <button
                       type="button"
-                      onClick={() => handleRunChannelTest('WHATSAPP')}
+                      onClick={() => {
+                        window.open("https://api.whatsapp.com/send/?phone=919042099020&text=Hi+WeatherGPT&type=phone_number&app_absent=0", "_blank");
+                        handleRunChannelTest('WHATSAPP');
+                      }}
                       disabled={testState['WHATSAPP']?.loading}
                       className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
                     >
                       <span>🧪</span>
-                      <span>{testState['WHATSAPP']?.loading ? 'Sending Test...' : 'Test WhatsApp'}</span>
+                      <span>{testState['WHATSAPP']?.loading ? 'Opening WhatsApp...' : 'Test WhatsApp'}</span>
                     </button>
                     {testState['WHATSAPP']?.message && (
                       <p className={`text-[11px] font-mono text-center ${testState['WHATSAPP'].error ? 'text-rose-400' : 'text-emerald-400'}`}>
