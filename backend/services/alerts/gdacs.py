@@ -23,8 +23,8 @@ from backend.schemas.alerts import (
 
 GDACS_FEED_URL = "https://www.gdacs.org/xml/rss.xml"
 
-INDIA_COUNTRY_TOKENS = {
-    "india", "ind", "in", "republic of india", "bharat"
+INDIA_EXACT_COUNTRIES = {
+    "india", "republic of india", "bharat"
 }
 
 GDACS_EVENT_TYPES: Dict[str, str] = {
@@ -211,8 +211,13 @@ class GdacsAlertProvider(BaseAlertProvider):
         is_active = True
 
 
-        country_lower = country.lower()
-        is_india = any(tok in country_lower for tok in INDIA_COUNTRY_TOKENS)
+        iso3_code = get_ns("iso3", "gdacs", "").upper()
+        country_clean = country.strip().lower()
+
+        is_india = (
+            country_clean in INDIA_EXACT_COUNTRIES
+            or iso3_code == "IND"
+        )
 
         affected_states: List[str] = []
         if is_india:
@@ -275,7 +280,7 @@ class GdacsAlertProvider(BaseAlertProvider):
     def _india_relevance_score(self, alert: DisasterAlert) -> int:
         score = 0
         area_lower = alert.affected_area.lower()
-        if any(tok in area_lower for tok in INDIA_COUNTRY_TOKENS) or "india" in [s.lower() for s in alert.affected_states]:
+        if area_lower in INDIA_EXACT_COUNTRIES or "india" in [s.lower() for s in alert.affected_states]:
             score += 100
         if alert.severity == AlertSeverity.EXTREME:
             score += 50
