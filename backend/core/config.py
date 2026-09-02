@@ -6,6 +6,7 @@ except ImportError:
     from pydantic import BaseSettings
     SettingsConfigDict = None
 
+
 class Settings(BaseSettings):
     """
     Application Settings validated through environment variables.
@@ -36,7 +37,6 @@ class Settings(BaseSettings):
     ALERT_CACHE_TTL_SECONDS: int = Field(default=300, env="ALERT_CACHE_TTL_SECONDS")          # 5 mins (fresh)
     ALERT_STALE_CACHE_TTL_SECONDS: int = Field(default=900, env="ALERT_STALE_CACHE_TTL_SECONDS") # 15 mins (stale fallback for emergencies)
 
-
     # Weather & Feed URLs
     OPEN_METEO_BASE_URL: str = Field(default="https://api.open-meteo.com/v1", env="OPEN_METEO_BASE_URL")
     OPEN_METEO_GEOCODING_URL: str = Field(default="https://geocoding-api.open-meteo.com/v1/search", env="OPEN_METEO_GEOCODING_URL")
@@ -47,25 +47,25 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = Field(default=None, env="GEMINI_API_KEY")
     GEMINI_MODEL: str = Field(default="gemini-3.5-flash-lite", env="GEMINI_MODEL")
 
-    # Priority Model 1: Gemini 3.5 Flash Lite (Application-level protective limits)
+    # Priority Model 1: Gemini 3.5 Flash Lite
     GEMINI_MODEL_1: str = Field(default="gemini-3.5-flash-lite", env="GEMINI_MODEL_1")
     GEMINI_FLASH_LITE_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_SAFE_RPM")
     GEMINI_FLASH_LITE_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_SAFE_RPD")
     GEMINI_FLASH_LITE_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_SAFE_TPM")
 
-    # Priority Model 2: Gemini 3.1 Flash Lite (Application-level protective limits)
+    # Priority Model 2: Gemini 3.1 Flash Lite
     GEMINI_MODEL_2: str = Field(default="gemini-3.1-flash-lite", env="GEMINI_MODEL_2")
     GEMINI_FLASH_LITE_31B_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_31B_SAFE_RPM")
     GEMINI_FLASH_LITE_31B_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_31B_SAFE_RPD")
     GEMINI_FLASH_LITE_31B_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_31B_SAFE_TPM")
 
-    # Priority Model 3: Gemma 4 31B (Application-level protective limits)
+    # Priority Model 3: Gemma 4 31B
     GEMINI_MODEL_3: str = Field(default="gemma-4-31b", env="GEMINI_MODEL_3")
     GEMMA_4_31B_SAFE_RPM: int = Field(default=25, env="GEMMA_4_31B_SAFE_RPM")
     GEMMA_4_31B_SAFE_RPD: int = Field(default=1000, env="GEMMA_4_31B_SAFE_RPD")
     GEMMA_4_31B_SAFE_TPM: int = Field(default=250000, env="GEMMA_4_31B_SAFE_TPM")
 
-    # Priority Model 4: Gemma 4 26B (Application-level protective limits)
+    # Priority Model 4: Gemma 4 26B
     GEMINI_MODEL_4: str = Field(default="gemma-4-26b", env="GEMINI_MODEL_4")
     GEMMA_4_26B_SAFE_RPM: int = Field(default=25, env="GEMMA_4_26B_SAFE_RPM")
     GEMMA_4_26B_SAFE_RPD: int = Field(default=1000, env="GEMMA_4_26B_SAFE_RPD")
@@ -73,8 +73,6 @@ class Settings(BaseSettings):
 
     # Quota Suppression Duration on 429
     GEMINI_429_SUPPRESS_SECONDS: int = Field(default=60, env="GEMINI_429_SUPPRESS_SECONDS")
-
-
 
     # Supabase / Database
     SUPABASE_URL: Optional[str] = Field(default=None, env="SUPABASE_URL")
@@ -105,7 +103,7 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: Optional[str] = Field(default=None, env="WHATSAPP_PHONE_NUMBER_ID")
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: Optional[str] = Field(default=None, env="WHATSAPP_WEBHOOK_VERIFY_TOKEN")
 
-    # Twilio Credentials & Settings (Primary Demo Provider)
+    # Twilio Credentials & Settings (Legacy / Secondary)
     TWILIO_ACCOUNT_SID: Optional[str] = Field(default=None, env="TWILIO_ACCOUNT_SID")
     TWILIO_AUTH_TOKEN: Optional[str] = Field(default=None, env="TWILIO_AUTH_TOKEN")
     TWILIO_SMS_FROM: Optional[str] = Field(default=None, env="TWILIO_SMS_FROM")
@@ -114,8 +112,13 @@ class Settings(BaseSettings):
     TWILIO_WHATSAPP_TO: Optional[str] = Field(default=None, env="TWILIO_WHATSAPP_TO")
     TWILIO_WHATSAPP_CONTENT_SID: Optional[str] = Field(default=None, env="TWILIO_WHATSAPP_CONTENT_SID")
 
-    # Provider Selection Routing ("twilio" | "exotel" | "meta")
-    SMS_PROVIDER: str = Field(default="twilio", env="SMS_PROVIDER")
+    # TextBee SMS Service (Android Phone + SIM Gateway)
+    TEXTBEE_API_KEY: Optional[str] = Field(default=None, env="TEXTBEE_API_KEY")
+    TEXTBEE_DEVICE_ID: Optional[str] = Field(default=None, env="TEXTBEE_DEVICE_ID")
+    TEXTBEE_BASE_URL: str = Field(default="https://api.textbee.dev/api/v1", env="TEXTBEE_BASE_URL")
+
+    # Provider Selection Routing ("textbee" | "exotel" | "twilio")
+    SMS_PROVIDER: str = Field(default="textbee", env="SMS_PROVIDER")
     VOICE_PROVIDER: str = Field(default="twilio", env="VOICE_PROVIDER")
     WHATSAPP_PROVIDER: str = Field(default="twilio", env="WHATSAPP_PROVIDER")
 
@@ -142,7 +145,8 @@ class Settings(BaseSettings):
             "gemini": bool(self.GEMINI_API_KEY),
             "supabase": bool(self.SUPABASE_URL and (self.SUPABASE_ANON_KEY or self.SUPABASE_SERVICE_ROLE_KEY)),
             "groq_whisper": bool(self.GROQ_API_KEY),
-            "twilio_sms": bool(self.TWILIO_ACCOUNT_SID and self.TWILIO_AUTH_TOKEN and self.TWILIO_SMS_FROM),
+            "textbee_sms": bool(self.TEXTBEE_API_KEY and self.TEXTBEE_DEVICE_ID),
+            "twilio_sms": False,  # Twilio removed from active SMS execution path
             "twilio_voice": bool(self.TWILIO_ACCOUNT_SID and self.TWILIO_AUTH_TOKEN and self.TWILIO_VOICE_FROM),
             "twilio_whatsapp": bool(self.TWILIO_ACCOUNT_SID and self.TWILIO_AUTH_TOKEN and self.TWILIO_WHATSAPP_FROM),
             "exotel_sms": bool(self.EXOTEL_ACCOUNT_SID and self.EXOTEL_API_KEY and self.EXOTEL_API_TOKEN),
@@ -155,5 +159,6 @@ class Settings(BaseSettings):
             "nasa_power": bool(self.NASA_POWER_BASE_URL),
             "sachet_ndma": bool(self.SACHET_NDMA_ALERT_FEED_URL),
         }
+
 
 settings = Settings()

@@ -20,6 +20,7 @@ from backend.schemas.notifications import (
 )
 from backend.services.notifications.whatsapp import whatsapp_notification_adapter
 from backend.services.notifications.exotel import exotel_sms_adapter
+from backend.services.notifications.textbee_sms import textbee_sms_adapter
 from backend.services.notifications.voice import exotel_voice_adapter
 from backend.services.notifications.twilio_sms import twilio_sms_adapter
 from backend.services.notifications.twilio_voice import twilio_voice_adapter
@@ -335,9 +336,9 @@ class NotificationOrchestrator:
                 return await twilio_whatsapp_adapter.send_notification(payload)
             return await whatsapp_notification_adapter.send_notification(payload)
         elif channel == NotificationChannel.SMS:
-            if settings.SMS_PROVIDER.lower() == "twilio":
-                return await twilio_sms_adapter.send_notification(payload)
-            return await exotel_sms_adapter.send_notification(payload)
+            if settings.SMS_PROVIDER.lower() == "exotel":
+                return await exotel_sms_adapter.send_notification(payload)
+            return await textbee_sms_adapter.send_notification(payload)
         elif channel == NotificationChannel.VOICE_IVR:
             if settings.VOICE_PROVIDER.lower() == "twilio":
                 return await twilio_voice_adapter.send_notification(payload)
@@ -350,7 +351,7 @@ class NotificationOrchestrator:
         if channel == NotificationChannel.WHATSAPP:
             return "Twilio WhatsApp" if settings.WHATSAPP_PROVIDER.lower() == "twilio" else "Meta WhatsApp Cloud API"
         elif channel == NotificationChannel.SMS:
-            return "Twilio SMS" if settings.SMS_PROVIDER.lower() == "twilio" else "Exotel SMS"
+            return "Exotel SMS" if settings.SMS_PROVIDER.lower() == "exotel" else "TextBee SMS"
         elif channel == NotificationChannel.VOICE_IVR:
             return "Twilio Voice / IVR" if settings.VOICE_PROVIDER.lower() == "twilio" else "Exotel Voice / IVR"
         elif channel == NotificationChannel.WEB_PUSH:

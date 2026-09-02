@@ -364,7 +364,7 @@ export default function NotificationSettingsModal({
                     />
                     <div>
                       <div className="font-bold text-white text-sm">📱 SMS Alerts</div>
-                      <div className="text-[11px] text-slate-400">Twilio / Exotel Gateway ({providerStatus['SMS'] || 'ACTIVE'})</div>
+                      <div className="text-[11px] text-slate-400">TextBee Android SIM Gateway ({providerStatus['SMS'] || 'ACTIVE'})</div>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
