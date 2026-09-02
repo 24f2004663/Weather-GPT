@@ -35,10 +35,13 @@ from backend.schemas.notifications import (
     ProviderStatusResponse,
     VapidPublicKeyResponse,
     NotificationChannel,
+    TestNotificationRequest,
 )
 from backend.services.weather.open_meteo import open_meteo_provider
 from backend.services.weather.nasa_power import nasa_power_provider
 from backend.services.alerts.sachet import sachet_alert_provider
+from backend.services.alerts.gdacs import gdacs_alert_provider
+from backend.services.alerts.engine import alert_ingestion_engine
 from backend.services.ai.gemini import gemini_ai_service
 from backend.services.ai.session import session_store
 from backend.services.audio.stt import groq_whisper_service, GroqConfigMissingError
@@ -68,6 +71,20 @@ async def _periodic_cleanup_loop(interval_seconds: float = 1800.0):
         except Exception as e:
             logger.error(f"Error in background cleanup loop: {e}")
 
+async def _periodic_alert_poll_loop(interval_seconds: float = 300.0):
+    """
+    Periodically polls SACHET and GDACS feeds, deduplicates alerts,
+    generates Gemini messages, and dispatches to Notification Event Bus.
+    """
+    while True:
+        try:
+            await asyncio.sleep(interval_seconds)
+            await alert_ingestion_engine.poll_and_dispatch()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in background alert poll loop: {e}")
+
 # ---------------------------------------------------------------------------
 # Application Lifespan
 # ---------------------------------------------------------------------------
@@ -79,17 +96,19 @@ async def lifespan(app: FastAPI):
     alert_event_bus.subscribe(notification_orchestrator.handle_alert_event)
     logger.info("Subscribed Notification Orchestrator to Disaster Alert Event Bus")
 
-    # Start background cleanup task
+    # Start background tasks
     cleanup_task = asyncio.create_task(_periodic_cleanup_loop(interval_seconds=1800.0))
+    alert_task = asyncio.create_task(_periodic_alert_poll_loop(interval_seconds=300.0))
 
     try:
         yield
     finally:
         # Shutdown sequence
         cleanup_task.cancel()
+        alert_task.cancel()
         try:
-            await cleanup_task
-        except asyncio.CancelledError:
+            await asyncio.gather(cleanup_task, alert_task, return_exceptions=True)
+        except Exception:
             pass
         await http_client_manager.close()
         logger.info("Gracefully stopped background tasks and closed HTTP connection pools")
@@ -330,6 +349,51 @@ async def get_disaster_alerts(
         last_synced=datetime.utcnow()
     )
 
+@app.get("/api/alerts/gdacs/top7", response_model=AlertListResponse, tags=["Disaster Alerts"])
+async def get_gdacs_top7_alerts(response: FastAPIResponse):
+    response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=900"
+    all_gdacs = await gdacs_alert_provider.fetch_active_alerts()
+    top7 = gdacs_alert_provider.get_top_alerts(all_gdacs, max_count=7)
+
+    severity_order = [
+        AlertSeverity.EXTREME,
+        AlertSeverity.SEVERE,
+        AlertSeverity.MODERATE,
+        AlertSeverity.MINOR,
+        AlertSeverity.UNKNOWN
+    ]
+    highest_sev = None
+    if top7:
+        present_sevs = {a.severity for a in top7}
+        for sev in severity_order:
+            if sev in present_sevs:
+                highest_sev = sev
+                break
+
+    return AlertListResponse(
+        source="GDACS",
+        query_location="Global / India Relevant",
+        total_count=len(top7),
+        active_count=len([a for a in top7 if a.is_active]),
+        highest_severity=highest_sev,
+        alerts=top7,
+        cached=False,
+        last_synced=datetime.utcnow()
+    )
+
+@app.post("/api/alerts/ingest", tags=["Disaster Alerts"])
+async def trigger_alert_ingest(response: FastAPIResponse):
+    """
+    Triggers a full SACHET/NDMA + GDACS ingestion, normalization, deduplication,
+    Gemini alert formatting, and notification pipeline cycle.
+    """
+    response.headers["Cache-Control"] = "no-store, private"
+    summary = await alert_ingestion_engine.poll_and_dispatch()
+    return {"status": "completed", "summary": summary, "timestamp": datetime.utcnow().isoformat()}
+
+
+
+
 # ---------------------------------------------------------------------------
 # Conversational AI & Audio STT Endpoints (Strictly private / no-store)
 # ---------------------------------------------------------------------------
@@ -451,6 +515,21 @@ async def preview_notification_message(request: NotificationPreviewRequest, resp
         channel=request.channel,
         language=request.language,
         recipient=request.recipient or "+919876543210"
+    )
+
+@app.post("/api/notifications/test", tags=["Notifications"])
+async def send_test_notification_endpoint(request: TestNotificationRequest, response: FastAPIResponse):
+    """
+    Triggers an isolated test message ONLY to the currently registered user's own destination.
+    - Does NOT invoke Gemini.
+    - Does NOT invoke SACHET or GDACS.
+    - Does NOT enter real emergency alert pipeline.
+    - Supported channels in Phase 1: WHATSAPP and WEB_PUSH only.
+    """
+    response.headers["Cache-Control"] = "no-store, private"
+    return await notification_orchestrator.send_test_notification(
+        user_identifier=request.user_id,
+        channel=request.channel
     )
 
 @app.post("/api/notifications/webhook/twilio-whatsapp", tags=["Notifications"])

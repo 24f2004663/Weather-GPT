@@ -262,7 +262,8 @@ class TestNotificationServices(unittest.TestCase):
         asyncio.run(self.orchestrator.save_subscription(SubscriptionRequest(
             user_identifier="user_chennai",
             phone_number="+919876543210",
-            enabled_channels=[NotificationChannel.SMS],
+            whatsapp_number="+919876543210",
+            enabled_channels=[NotificationChannel.WHATSAPP],
             min_severity_threshold=AlertSeverity.SEVERE,
             target_states=["Tamil Nadu"],
             target_districts=["Chennai"]
@@ -271,7 +272,8 @@ class TestNotificationServices(unittest.TestCase):
         asyncio.run(self.orchestrator.save_subscription(SubscriptionRequest(
             user_identifier="user_mumbai",
             phone_number="+919999999999",
-            enabled_channels=[NotificationChannel.SMS],
+            whatsapp_number="+919999999999",
+            enabled_channels=[NotificationChannel.WHATSAPP],
             min_severity_threshold=AlertSeverity.MODERATE,
             target_states=["Maharashtra"],
             target_districts=["Mumbai"]
@@ -623,3 +625,83 @@ class TestNotificationServices(unittest.TestCase):
             })
             self.assertEqual(res.status_code, 503)
             self.assertIn("Database persistence error", res.json()["detail"])
+
+    # 21. Phase 1 Test Notification Isolation & Channel Guard
+    def test_phase1_test_notification_whatsapp_success(self):
+        # Save active user subscription with WHATSAPP
+        sub = NotificationSubscription(
+            subscription_id="sub-test-1",
+            user_identifier="phase1_user",
+            phone_number="+919876543210",
+            whatsapp_number="+919876543210",
+            enabled_channels=[NotificationChannel.WHATSAPP, NotificationChannel.WEB_PUSH],
+            is_opted_in=True
+        )
+        asyncio.run(self.mock_supabase.save_subscription(sub))
+
+        # Trigger POST /api/notifications/test for WHATSAPP
+        res = self.client.post("/api/notifications/test", json={
+            "user_id": "phase1_user",
+            "channel": "WHATSAPP"
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["channel"], "WHATSAPP")
+        self.assertEqual(data["alert_id"], "TEST-NOTIFICATION")
+        self.assertEqual(data["status"], "SIMULATED")  # Dry-run safe mode
+
+    def test_phase1_test_notification_web_push_success(self):
+        sub = NotificationSubscription(
+            subscription_id="sub-test-2",
+            user_identifier="phase1_push_user",
+            phone_number="+919876543210",
+            enabled_channels=[NotificationChannel.WEB_PUSH],
+            is_opted_in=True
+        )
+        asyncio.run(self.mock_supabase.save_subscription(sub))
+
+        res = self.client.post("/api/notifications/test", json={
+            "user_id": "phase1_push_user",
+            "channel": "WEB_PUSH"
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["channel"], "WEB_PUSH")
+        self.assertEqual(data["alert_id"], "TEST-NOTIFICATION")
+
+    def test_phase1_test_notification_sms_disabled_400(self):
+        sub = NotificationSubscription(
+            subscription_id="sub-test-3",
+            user_identifier="phase1_sms_user",
+            phone_number="+919876543210",
+            enabled_channels=[NotificationChannel.SMS],
+            is_opted_in=True
+        )
+        asyncio.run(self.mock_supabase.save_subscription(sub))
+
+        # Triggering SMS in Phase 1 MUST return 400 Bad Request
+        res = self.client.post("/api/notifications/test", json={
+            "user_id": "phase1_sms_user",
+            "channel": "SMS"
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("not active in Phase 1", res.json()["detail"])
+
+    def test_phase1_test_notification_voice_disabled_400(self):
+        sub = NotificationSubscription(
+            subscription_id="sub-test-4",
+            user_identifier="phase1_voice_user",
+            phone_number="+919876543210",
+            enabled_channels=[NotificationChannel.VOICE_IVR],
+            is_opted_in=True
+        )
+        asyncio.run(self.mock_supabase.save_subscription(sub))
+
+        # Triggering Voice/IVR in Phase 1 MUST return 400 Bad Request
+        res = self.client.post("/api/notifications/test", json={
+            "user_id": "phase1_voice_user",
+            "channel": "VOICE_IVR"
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("not active in Phase 1", res.json()["detail"])
+

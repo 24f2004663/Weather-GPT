@@ -37,6 +37,7 @@ class AlertSource(str, Enum):
     IMD = "IMD"
     CWC = "CWC"
     NDMA = "NDMA"
+    GDACS = "GDACS"
     OTHER = "OTHER"
 
 class GeographicScope(str, Enum):

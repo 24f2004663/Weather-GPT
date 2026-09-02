@@ -7,13 +7,15 @@ interface WeatherMapProps {
   location: LocationResult;
   weather: NormalizedWeatherResponse | null;
   alerts: DisasterAlert[] | null;
+  gdacsAlerts?: DisasterAlert[] | null;
 }
 
-export default function WeatherMap({ location, weather, alerts }: WeatherMapProps) {
+export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: WeatherMapProps) {
   const [zoom, setZoom] = useState<number>(10);
 
   const activeAlerts = alerts?.filter((a) => a.is_active) || [];
-  const hasAlert = activeAlerts.length > 0;
+  const activeGdacs = gdacsAlerts?.filter((a) => a.is_active) || [];
+  const hasAlert = activeAlerts.length > 0 || activeGdacs.length > 0;
   const currentTemp = weather?.current?.temperature_c;
 
   // Simple static/interactive map view using public OpenStreetMap tiles or canvas representation

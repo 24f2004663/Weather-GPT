@@ -126,6 +126,9 @@ class NotificationOrchestrator:
             all_subs = await supabase_client.get_all_active_subscriptions()
 
         tasks = []
+        # Phase 1 active notification channels (SMS and Voice/IVR excluded in Phase 1)
+        PHASE_1_ACTIVE_CHANNELS = {NotificationChannel.WHATSAPP, NotificationChannel.WEB_PUSH}
+
         for sub in all_subs:
             if not sub.is_opted_in:
                 continue
@@ -138,9 +141,10 @@ class NotificationOrchestrator:
             if not self._check_geographic_match(alert, sub):
                 continue
 
-            # 3. Schedule delivery tasks for each enabled channel
+            # 3. Schedule delivery tasks for Phase 1 active channels only
             for channel in sub.enabled_channels:
-                tasks.append(self._process_single_delivery(alert, sub, channel))
+                if channel in PHASE_1_ACTIVE_CHANNELS:
+                    tasks.append(self._process_single_delivery(alert, sub, channel))
 
         if not tasks:
             return []
@@ -370,4 +374,87 @@ class NotificationOrchestrator:
             }
         )
 
+    async def send_test_notification(
+        self,
+        user_identifier: str,
+        channel: NotificationChannel
+    ) -> NotificationRecord:
+        """
+        Phase 1 Isolated Test Notification Action.
+        Sends a test message ONLY to the currently registered user's own configured destination.
+        - Does NOT invoke Gemini.
+        - Does NOT invoke SACHET or GDACS.
+        - Does NOT enter the real emergency-alert pipeline.
+        - Active in Phase 1 ONLY for WHATSAPP and WEB_PUSH.
+        """
+        # Phase 1 Guard: Only WHATSAPP and WEB_PUSH are active
+        if channel in [NotificationChannel.SMS, NotificationChannel.VOICE_IVR]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Channel '{channel.value}' is not active in Phase 1. Only WHATSAPP and WEB_PUSH are supported."
+            )
+
+        # 1. Fetch user subscription from Supabase to retrieve destination
+        sub = await self.get_subscription(user_identifier)
+        if not sub or not sub.is_opted_in:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No active subscription found for user '{user_identifier}'. Please save preferences first."
+            )
+
+        if channel not in sub.enabled_channels:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Channel '{channel.value}' is not enabled in user preferences."
+            )
+
+        recipient = None
+        if channel == NotificationChannel.WHATSAPP:
+            recipient = sub.whatsapp_number or sub.phone_number
+        elif channel == NotificationChannel.WEB_PUSH:
+            recipient = sub.user_identifier
+
+        if not recipient:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No recipient details configured for channel '{channel.value}'."
+            )
+
+        # Fixed mandatory Phase 1 test message
+        test_message = "You have subscribed to WeatherGPT.\nThis is a test message you triggered."
+
+        payload = NotificationPayload(
+            recipient_identifier=recipient,
+            channel=channel,
+            title="WeatherGPT Test Notification",
+            message=test_message,
+            priority="high",
+            alert_id="TEST-NOTIFICATION",
+            language=sub.preferred_language,
+            push_subscription=sub.push_subscription if channel == NotificationChannel.WEB_PUSH else None
+        )
+
+        try:
+            delivery_status = await self._dispatch_to_adapter(channel, payload)
+        except Exception as e:
+            logger.error(f"Provider adapter error on test channel {channel.value}: {str(e)}")
+            delivery_status = None
+
+        record = NotificationRecord(
+            notification_id=delivery_status.notification_id if delivery_status else str(uuid.uuid4()),
+            alert_id="TEST-NOTIFICATION",
+            channel=channel,
+            recipient=mask_phone_number(recipient) or recipient,
+            status=delivery_status.status if delivery_status else NotificationStatus.FAILED,
+            provider=self._get_provider_name(channel),
+            sent_at=datetime.utcnow() if delivery_status and delivery_status.status in [NotificationStatus.SENT, NotificationStatus.SIMULATED] else None,
+            failed_at=datetime.utcnow() if not delivery_status or delivery_status.status == NotificationStatus.FAILED else None,
+            provider_message_id=delivery_status.provider_reference if delivery_status else None,
+            error_message=delivery_status.error_message if delivery_status else "Unhandled adapter exception",
+            idempotency_key=f"test:{user_identifier}:{channel.value}:{time.time()}",
+            dry_run=delivery_status.is_simulated if delivery_status else settings.NOTIFICATION_DRY_RUN
+        )
+        return record
+
 notification_orchestrator = NotificationOrchestrator()
+

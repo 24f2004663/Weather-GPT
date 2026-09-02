@@ -35,7 +35,6 @@ GRANT ALL ON TABLE public.alert_subscriptions TO service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;
 
 -- 3. Explicitly REVOKE all permissions from anon and authenticated roles
--- (The browser / client never talks directly to Supabase; all mutations flow through Render)
 REVOKE ALL ON TABLE public.alert_subscriptions FROM anon, authenticated;
 
 -- 4. Clean up any permissive public policies
@@ -48,6 +47,31 @@ DROP POLICY IF EXISTS "Service role full access on alert_subscriptions" ON publi
 -- 5. Dedicated policy for service_role
 CREATE POLICY "Service role full access on alert_subscriptions"
     ON public.alert_subscriptions
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- ============================================================================
+-- WeatherGPT: Persistent Alert Deduplication Table (seen_alerts)
+-- Tracks processed disaster alerts for deduplication across backend restarts
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.seen_alerts (
+    alert_id VARCHAR(128) PRIMARY KEY,
+    source VARCHAR(64) NOT NULL,
+    severity VARCHAR(30) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    last_seen_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.seen_alerts ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON TABLE public.seen_alerts TO service_role;
+REVOKE ALL ON TABLE public.seen_alerts FROM anon, authenticated;
+
+DROP POLICY IF EXISTS "Service role full access on seen_alerts" ON public.seen_alerts;
+CREATE POLICY "Service role full access on seen_alerts"
+    ON public.seen_alerts
     FOR ALL
     TO service_role
     USING (true)

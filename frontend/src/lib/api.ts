@@ -186,3 +186,34 @@ export async function transcribeAudio(formData: FormData): Promise<{ transcripti
   }
   return await res.json();
 }
+
+export async function fetchGdacsTop7(): Promise<AlertListResponse> {
+  const url = `${API_BASE_URL}/api/alerts/gdacs/top7`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+  if (!res.ok) {
+    throw new Error(`GDACS top 7 fetch failed: HTTP ${res.status}`);
+  }
+  return await res.json();
+}
+
+export async function sendTestNotification(
+  userId: string,
+  channel: 'WHATSAPP' | 'WEB_PUSH' | 'SMS' | 'VOICE_IVR'
+): Promise<any> {
+  const url = `${API_BASE_URL}/api/notifications/test`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId, channel }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || `Test notification failed: HTTP ${res.status}`);
+  }
+  return data;
+}
+

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LocationResult } from '../types';
-import { API_BASE_URL } from '../lib/api';
+import { API_BASE_URL, sendTestNotification } from '../lib/api';
 
 interface NotificationSettingsModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export default function NotificationSettingsModal({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [channels, setChannels] = useState<{ whatsapp: boolean; sms: boolean; voice: boolean; web_push: boolean }>({
     whatsapp: true,
-    sms: true,
+    sms: false,
     voice: false,
     web_push: true,
   });
@@ -34,7 +34,10 @@ export default function NotificationSettingsModal({
   const [providerStatus, setProviderStatus] = useState<Record<string, string>>({});
   const [webPushStatus, setWebPushStatus] = useState<string>('Ready');
 
-  const userId = 'weathergpt_web_user'; // Prototype client identifier
+  // Channel test state: { [channel]: { loading: boolean, message: string | null, error: boolean } }
+  const [testState, setTestState] = useState<Record<string, { loading: boolean; message: string | null; error: boolean }>>({});
+
+  const userId = 'weathergpt_web_user'; // Registered user identifier
 
   useEffect(() => {
     if (isOpen) {
@@ -50,8 +53,8 @@ export default function NotificationSettingsModal({
             const chs = data.enabled_channels || [];
             setChannels({
               whatsapp: chs.includes('WHATSAPP'),
-              sms: chs.includes('SMS'),
-              voice: chs.includes('VOICE_IVR'),
+              sms: false, // Phase 1: SMS disabled
+              voice: false, // Phase 1: Voice disabled
               web_push: chs.includes('WEB_PUSH'),
             });
           }
@@ -85,8 +88,8 @@ export default function NotificationSettingsModal({
         return null;
       }
 
-      // Register SW
-      const reg = await navigator.serviceWorker.register('/sw.js');
+      // Register Service Worker
+      await navigator.serviceWorker.register('/sw.js');
       setWebPushStatus('Service Worker Active');
 
       // Fetch VAPID key
@@ -116,8 +119,6 @@ export default function NotificationSettingsModal({
 
     const enabledList = [];
     if (channels.whatsapp) enabledList.push('WHATSAPP');
-    if (channels.sms) enabledList.push('SMS');
-    if (channels.voice) enabledList.push('VOICE_IVR');
     if (channels.web_push) enabledList.push('WEB_PUSH');
 
     try {
@@ -144,7 +145,7 @@ export default function NotificationSettingsModal({
       }
       setIsSubscribed(true);
       if (onSubscriptionChange) onSubscriptionChange(true);
-      setStatusMessage('Preferences saved. You are opted in for disaster alerts.');
+      setStatusMessage('Preferences saved successfully. You are opted in for Phase 1 emergency alerts.');
     } catch (err: any) {
       setStatusMessage(err.message || 'Error updating preferences.');
     } finally {
@@ -171,129 +172,226 @@ export default function NotificationSettingsModal({
     }
   };
 
+  const handleRunChannelTest = async (channelKey: 'WHATSAPP' | 'WEB_PUSH') => {
+    setTestState((prev) => ({
+      ...prev,
+      [channelKey]: { loading: true, message: null, error: false },
+    }));
+
+    try {
+      const result = await sendTestNotification(userId, channelKey);
+      setTestState((prev) => ({
+        ...prev,
+        [channelKey]: {
+          loading: false,
+          message: `✅ Test message sent! Status: ${result.status || 'SENT'} (${result.provider || 'Adapter'})`,
+          error: false,
+        },
+      }));
+    } catch (err: any) {
+      setTestState((prev) => ({
+        ...prev,
+        [channelKey]: {
+          loading: false,
+          message: `❌ Test failed: ${err.message || 'Error sending test message'}`,
+          error: true,
+        },
+      }));
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 relative max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 relative max-h-[92vh] overflow-y-auto">
         {/* Modal Header */}
         <div className="flex items-start justify-between border-b border-slate-800 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-lg text-white shadow-lg shadow-rose-500/20">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-xl text-white shadow-lg shadow-rose-500/20">
               🚨
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Emergency Alert Preferences</h3>
-              <p className="text-xs text-slate-400">Multi-Channel Proactive SACHET/NDMA Disaster Warnings</p>
+              <h3 className="text-lg font-bold text-white">Emergency Alert Preferences</h3>
+              <p className="text-xs text-slate-400">SACHET/NDMA & GDACS Emergency Disaster Warnings — Phase 1</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white text-lg font-bold p-1"
+            className="text-slate-400 hover:text-white text-xl font-bold p-1 transition-colors"
           >
             ✕
           </button>
         </div>
 
         {statusMessage && (
-          <div className="p-3 bg-sky-950/80 border border-sky-800 rounded-xl text-xs text-sky-200 flex items-center justify-between">
+          <div className="p-3.5 bg-sky-950/80 border border-sky-800 rounded-xl text-xs text-sky-200 flex items-center justify-between shadow-md">
             <span>{statusMessage}</span>
-            <button type="button" onClick={() => setStatusMessage(null)} className="text-sky-400 font-bold">×</button>
+            <button type="button" onClick={() => setStatusMessage(null)} className="text-sky-400 font-bold ml-2">✕</button>
           </div>
         )}
 
-        {/* Subscription Status Pill */}
-        <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-2xl border border-slate-800 text-xs">
-          <div className="flex items-center space-x-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${isSubscribed ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-            <span className="font-semibold text-white">
-              Status: {isSubscribed ? 'Opted In (Active)' : 'Not Subscribed'}
-            </span>
+        {/* Subscription Status Banner */}
+        <div className="flex flex-wrap items-center justify-between p-4 bg-slate-950/90 rounded-2xl border border-slate-800 gap-3 text-xs">
+          <div className="flex items-center space-x-2.5">
+            <span className={`h-3.5 w-3.5 rounded-full ${isSubscribed ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+            <div>
+              <span className="font-bold text-white">
+                Status: {isSubscribed ? 'Opted In (Active Subscriber)' : 'Not Subscribed'}
+              </span>
+              <p className="text-[11px] text-slate-400">
+                Authoritative Supabase persistence enabled
+              </p>
+            </div>
           </div>
-          <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-400 font-mono text-[10px] border border-slate-800">
-            Dry-Run Safe Mode Active
+          <span className="px-3 py-1 rounded-lg bg-sky-950 text-sky-300 font-mono text-[11px] font-bold border border-sky-800">
+            Phase 1 Pipeline (WhatsApp + Web Push)
           </span>
         </div>
 
         {/* Form Fields */}
-        <div className="space-y-4 text-xs">
+        <div className="space-y-6 text-xs">
           {/* Phone Number */}
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-200">Mobile / WhatsApp Number</label>
+            <label className="font-bold text-slate-200 text-sm">Mobile / WhatsApp Number</label>
             <input
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="+91 98765 43210"
-              className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3.5 py-2 text-white placeholder-slate-600 focus:outline-none"
+              className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none"
             />
-            <p className="text-[11px] text-slate-500">Required for SMS, WhatsApp, and Voice/IVR emergency calls.</p>
+            <p className="text-[11px] text-slate-500">Must match E.164 format (e.g. +919876543210) for WhatsApp alert delivery.</p>
           </div>
 
-          {/* Delivery Channels */}
-          <div className="space-y-2">
-            <label className="font-bold text-slate-200">Emergency Notification Channels</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <label className="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={channels.whatsapp}
-                  onChange={(e) => setChannels({ ...channels, whatsapp: e.target.checked })}
-                  className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700"
-                />
-                <div>
-                  <div className="font-semibold text-white">💬 WhatsApp</div>
-                  <div className="text-[10px] text-slate-500">Meta Cloud API ({providerStatus['WHATSAPP'] || 'DRY_RUN'})</div>
-                </div>
-              </label>
+          {/* Delivery Channels Grid with Test Buttons */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="font-bold text-slate-200 text-sm">Emergency Notification Channels</label>
+              <span className="text-[11px] text-slate-400">Phase 1 channels only; Test buttons send isolated test messages</span>
+            </div>
 
-              <label className="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={channels.sms}
-                  onChange={(e) => setChannels({ ...channels, sms: e.target.checked })}
-                  className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700"
-                />
-                <div>
-                  <div className="font-semibold text-white">📱 SMS Alerts</div>
-                  <div className="text-[10px] text-slate-500">Exotel Gateway ({providerStatus['SMS'] || 'DRY_RUN'})</div>
-                </div>
-              </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* WhatsApp (Phase 1 Active) */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all space-y-3">
+                <label className="flex items-start justify-between cursor-pointer">
+                  <div className="flex items-center space-x-2.5">
+                    <input
+                      type="checkbox"
+                      checked={channels.whatsapp}
+                      onChange={(e) => setChannels({ ...channels, whatsapp: e.target.checked })}
+                      className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
+                    />
+                    <div>
+                      <div className="font-bold text-white text-sm">💬 WhatsApp</div>
+                      <div className="text-[11px] text-slate-400">Live Baileys Adapter ({providerStatus['WHATSAPP'] || 'ACTIVE'})</div>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    Phase 1 Active
+                  </span>
+                </label>
 
-              <label className="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={channels.voice}
-                  onChange={(e) => setChannels({ ...channels, voice: e.target.checked })}
-                  className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700"
-                />
-                <div>
-                  <div className="font-semibold text-white">📞 Voice / IVR Call</div>
-                  <div className="text-[10px] text-slate-500">Critical Warnings ({providerStatus['VOICE_IVR'] || 'DRY_RUN'})</div>
-                </div>
-              </label>
+                {channels.whatsapp && isSubscribed && (
+                  <div className="pt-2 border-t border-slate-900 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRunChannelTest('WHATSAPP')}
+                      disabled={testState['WHATSAPP']?.loading}
+                      className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
+                    >
+                      <span>🧪</span>
+                      <span>{testState['WHATSAPP']?.loading ? 'Sending Test...' : 'Test WhatsApp'}</span>
+                    </button>
+                    {testState['WHATSAPP']?.message && (
+                      <p className={`text-[11px] font-mono text-center ${testState['WHATSAPP'].error ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {testState['WHATSAPP'].message}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
 
-              <label className="flex items-center space-x-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer hover:border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={channels.web_push}
-                  onChange={(e) => setChannels({ ...channels, web_push: e.target.checked })}
-                  className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700"
-                />
-                <div>
-                  <div className="font-semibold text-white">🔔 Web Push</div>
-                  <div className="text-[10px] text-slate-500">Browser Push ({providerStatus['WEB_PUSH'] || 'DRY_RUN'})</div>
+              {/* Web Push (Phase 1 Active) */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all space-y-3">
+                <label className="flex items-start justify-between cursor-pointer">
+                  <div className="flex items-center space-x-2.5">
+                    <input
+                      type="checkbox"
+                      checked={channels.web_push}
+                      onChange={(e) => setChannels({ ...channels, web_push: e.target.checked })}
+                      className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
+                    />
+                    <div>
+                      <div className="font-bold text-white text-sm">🔔 Web Push</div>
+                      <div className="text-[11px] text-slate-400">Browser VAPID ({providerStatus['WEB_PUSH'] || 'ACTIVE'})</div>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    Phase 1 Active
+                  </span>
+                </label>
+
+                {channels.web_push && isSubscribed && (
+                  <div className="pt-2 border-t border-slate-900 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRunChannelTest('WEB_PUSH')}
+                      disabled={testState['WEB_PUSH']?.loading}
+                      className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
+                    >
+                      <span>🧪</span>
+                      <span>{testState['WEB_PUSH']?.loading ? 'Sending Test...' : 'Test Web Push'}</span>
+                    </button>
+                    {testState['WEB_PUSH']?.message && (
+                      <p className={`text-[11px] font-mono text-center ${testState['WEB_PUSH'].error ? 'text-rose-400' : 'text-emerald-400'}`}>
+                        {testState['WEB_PUSH'].message}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* SMS Alerts (Phase 2 — Disabled) */}
+              <div className="p-4 rounded-2xl bg-slate-950/50 border border-slate-800/60 opacity-50 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <input type="checkbox" disabled checked={false} className="rounded bg-slate-900 border-slate-800 cursor-not-allowed" />
+                    <div>
+                      <div className="font-bold text-slate-400 text-sm">📱 SMS Alerts</div>
+                      <div className="text-[10px] text-slate-500">Twilio / Exotel Gateway</div>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-900 text-slate-500 border border-slate-800">
+                    Phase 2 (Disabled in Phase 1)
+                  </span>
                 </div>
-              </label>
+              </div>
+
+              {/* Voice / IVR Call (Phase 2 — Disabled) */}
+              <div className="p-4 rounded-2xl bg-slate-950/50 border border-slate-800/60 opacity-50 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <input type="checkbox" disabled checked={false} className="rounded bg-slate-900 border-slate-800 cursor-not-allowed" />
+                    <div>
+                      <div className="font-bold text-slate-400 text-sm">📞 Voice / IVR Call</div>
+                      <div className="text-[10px] text-slate-500">Critical Warnings Call</div>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-900 text-slate-500 border border-slate-800">
+                    Phase 2 (Disabled in Phase 1)
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Minimum Severity Threshold */}
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-200">Minimum Severity Filter</label>
+            <label className="font-bold text-slate-200 text-sm">Minimum Severity Filter</label>
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value as any)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-white focus:outline-none cursor-pointer"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none cursor-pointer"
             >
               <option value="Severe">Severe & Extreme Alerts (Recommended)</option>
               <option value="Extreme">Extreme Emergency Only (Cyclones, Flash Floods)</option>
@@ -301,32 +399,32 @@ export default function NotificationSettingsModal({
           </div>
 
           {/* Target Region */}
-          <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1">
-            <div className="font-bold text-slate-300">Geographic Coverage Scope:</div>
+          <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-1">
+            <div className="font-bold text-slate-300 text-xs">Geographic Coverage Scope:</div>
             <div className="text-slate-400 font-mono text-[11px]">
-              {selectedLocation ? `${selectedLocation.name}, ${selectedLocation.admin1 || selectedLocation.country}` : 'India (National)'}
+              {selectedLocation ? `${selectedLocation.name}, ${selectedLocation.admin1 || selectedLocation.country}` : 'India (National Coverage)'}
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
           {isSubscribed ? (
             <button
               type="button"
               onClick={handleUnsubscribe}
               disabled={isSaving}
-              className="px-4 py-2 rounded-xl bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold border border-rose-800 transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold text-xs border border-rose-800 transition-colors"
             >
               Unsubscribe All
             </button>
           ) : <div />}
 
-          <div className="flex space-x-2">
+          <div className="flex space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium transition-colors"
+              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
             >
               Cancel
             </button>
@@ -334,7 +432,7 @@ export default function NotificationSettingsModal({
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition-all shadow-lg shadow-sky-600/20"
+              className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-lg shadow-sky-600/20"
             >
               {isSaving ? 'Saving...' : 'Save & Opt-In'}
             </button>
@@ -342,7 +440,7 @@ export default function NotificationSettingsModal({
         </div>
 
         <p className="text-[10px] text-slate-500 leading-relaxed font-mono">
-          * Explicit consent notice: Emergency alerts are strictly delivered based on authoritative SACHET/NDMA bulletins. Subscriptions are currently stored in memory during this prototype session.
+          * Explicit consent notice: Emergency disaster alerts are powered by authoritative SACHET/NDMA and GDACS feeds. Preferences are persisted in Supabase. Phase 1 active channels: WhatsApp & Web Push.
         </p>
       </div>
     </div>

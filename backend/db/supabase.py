@@ -2,7 +2,7 @@ import re
 import json
 import httpx
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from backend.core.config import settings
 from backend.core.logging import logger
@@ -230,4 +230,74 @@ class SupabaseClient:
             is_opted_in=bool(row.get("is_opted_in", True)),
         )
 
+    async def has_seen_alert(self, alert_id: str) -> Tuple[bool, Optional[str]]:
+        """
+        Checks if an alert ID has been seen in Supabase.
+        Returns (has_seen, previous_severity).
+        """
+        if not self.has_credentials:
+            return False, None
+
+        endpoint = f"{self.url}/rest/v1/seen_alerts"
+        params = {"alert_id": f"eq.{alert_id}", "select": "alert_id,severity,is_active"}
+        headers = self._get_headers()
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.get(endpoint, headers=headers, params=params)
+                if res.status_code == 200:
+                    rows = res.json()
+                    if rows:
+                        return True, rows[0].get("severity")
+                return False, None
+        except Exception as e:
+            logger.error(f"Supabase has_seen_alert query error: {str(e)}")
+            return False, None
+
+    async def mark_alert_seen(self, alert_id: str, source: str, severity: str, is_active: bool = True) -> bool:
+        """
+        Records or updates an alert in seen_alerts.
+        """
+        if not self.has_credentials:
+            return False
+
+        payload = {
+            "alert_id": alert_id,
+            "source": source,
+            "severity": severity,
+            "is_active": is_active,
+            "last_seen_at": datetime.utcnow().isoformat(),
+        }
+        endpoint = f"{self.url}/rest/v1/seen_alerts?on_conflict=alert_id"
+        headers = self._get_headers(prefer="resolution=merge-duplicates")
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.post(endpoint, headers=headers, json=payload)
+                return res.status_code in (200, 201, 204)
+        except Exception as e:
+            logger.error(f"Supabase mark_alert_seen error: {str(e)}")
+            return False
+
+    async def mark_alert_inactive(self, alert_id: str) -> bool:
+        """
+        Marks an alert as inactive in seen_alerts.
+        """
+        if not self.has_credentials:
+            return False
+
+        endpoint = f"{self.url}/rest/v1/seen_alerts"
+        params = {"alert_id": f"eq.{alert_id}"}
+        headers = self._get_headers()
+        payload = {"is_active": False, "last_seen_at": datetime.utcnow().isoformat()}
+
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.patch(endpoint, headers=headers, params=params, json=payload)
+                return res.status_code in (200, 204)
+        except Exception as e:
+            logger.error(f"Supabase mark_alert_inactive error: {str(e)}")
+            return False
+
 supabase_client = SupabaseClient()
+

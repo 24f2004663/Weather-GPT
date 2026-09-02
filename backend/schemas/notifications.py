@@ -168,3 +168,8 @@ class VapidPublicKeyResponse(BaseModel):
     public_key: Optional[str] = None
     status: str = Field(..., description="'CONFIGURED' or 'NOT_CONFIGURED'")
     claim_email: str
+
+class TestNotificationRequest(BaseModel):
+    user_id: str = Field(..., description="Registered user identifier")
+    channel: NotificationChannel = Field(..., description="Channel to trigger test notification for")
+

@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import CurrentWeatherCard from '../components/CurrentWeatherCard';
 import PersonalizedInsights from '../components/PersonalizedInsights';
 import DisasterAlertBanner from '../components/DisasterAlertBanner';
+import GdacsAlertsPanel from '../components/GdacsAlertsPanel';
 import HourlyForecastStrip from '../components/HourlyForecastStrip';
 import WeatherCharts from '../components/WeatherCharts';
 import WeatherMap from '../components/WeatherMap';
@@ -42,6 +43,7 @@ export default function HomePage() {
   const [weatherData, setWeatherData] = useState<NormalizedWeatherResponse | null>(null);
   const [climateData, setClimateData] = useState<NasaPowerClimateResponse | null>(null);
   const [alerts, setAlerts] = useState<DisasterAlert[] | null>(null);
+  const [gdacsAlerts, setGdacsAlerts] = useState<DisasterAlert[] | null>(null);
 
   const [isLoadingWeather, setIsLoadingWeather] = useState<boolean>(true);
   const [isLoadingClimate, setIsLoadingClimate] = useState<boolean>(true);
@@ -176,11 +178,15 @@ export default function HomePage() {
               onRetry={() => loadDataForLocation(selectedLocation)}
             />
 
-            {/* 4. Interactive Geospatial Weather & Alert Map */}
+            {/* 4. Top 7 Live GDACS Disaster Alerts */}
+            <GdacsAlertsPanel onAlertsLoaded={setGdacsAlerts} />
+
+            {/* 5. Interactive Geospatial Weather & Alert Map */}
             <WeatherMap
               location={selectedLocation}
               weather={weatherData}
               alerts={alerts}
+              gdacsAlerts={gdacsAlerts}
             />
 
             {/* 5. 24-Hour Hourly Scrollable Strip */}
