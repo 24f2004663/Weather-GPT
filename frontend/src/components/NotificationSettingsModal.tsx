@@ -116,15 +116,19 @@ export default function NotificationSettingsModal({
         return null;
       }
 
-      // Check existing PushSubscription or create new one
+      // Re-create PushSubscription tied strictly to current VAPID public key
       let sub = await reg.pushManager.getSubscription();
-      if (!sub) {
-        const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: applicationServerKey as any,
-        });
+      if (sub) {
+        try {
+          await sub.unsubscribe();
+        } catch (_) {}
       }
+      
+      const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: applicationServerKey as any,
+      });
 
       setWebPushStatus('PushSubscription Active');
       return sub.toJSON();
