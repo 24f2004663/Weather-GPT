@@ -72,18 +72,49 @@ class WebPushNotificationAdapter(BaseNotificationAdapter):
             "tag": f"weathergpt-alert-{payload.alert_id or 'general'}",
             "data": {
                 "alert_id": payload.alert_id,
-                "url": "/api/alerts",
+                "url": "/",
                 "priority": payload.priority
             }
         }
 
-        # Simulated live dispatch stub for browser web push endpoint
+        # If push_subscription dictionary is attached, dispatch via pywebpush
+        if payload.push_subscription and isinstance(payload.push_subscription, dict):
+            try:
+                from pywebpush import webpush
+                res = webpush(
+                    subscription_info=payload.push_subscription,
+                    data=json.dumps(push_data),
+                    vapid_private_key=self.private_key,
+                    vapid_claims={"sub": self.claim_email or "mailto:admin@weathergpt.org"}
+                )
+                logger.info(f"Web Push VAPID dispatched successfully to {recipient}. Status: {res.status_code}")
+                return DeliveryStatus(
+                    notification_id=notification_id,
+                    channel=NotificationChannel.WEB_PUSH,
+                    recipient=recipient,
+                    status=NotificationStatus.SENT,
+                    provider_reference=f"vapid_push_{uuid.uuid4().hex[:12]}",
+                    timestamp=datetime.utcnow()
+                )
+            except Exception as e:
+                logger.error(f"pywebpush dispatch failed for {recipient}: {str(e)}")
+                return DeliveryStatus(
+                    notification_id=notification_id,
+                    channel=NotificationChannel.WEB_PUSH,
+                    recipient=recipient,
+                    status=NotificationStatus.FAILED,
+                    error_message=f"Web Push delivery error: {str(e)}",
+                    timestamp=datetime.utcnow()
+                )
+
+        # Fallback if push_subscription JSON is missing in subscription record
+        logger.warning(f"Web Push target {recipient} has no active push_subscription payload in database.")
         return DeliveryStatus(
             notification_id=notification_id,
             channel=NotificationChannel.WEB_PUSH,
             recipient=recipient,
-            status=NotificationStatus.SENT,
-            provider_reference=f"vapid_push_{uuid.uuid4().hex[:12]}",
+            status=NotificationStatus.FAILED,
+            error_message="No active browser PushSubscription stored in database.",
             timestamp=datetime.utcnow()
         )
 

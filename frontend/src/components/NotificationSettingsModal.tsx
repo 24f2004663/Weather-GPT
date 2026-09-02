@@ -75,6 +75,17 @@ export default function NotificationSettingsModal({
 
   if (!isOpen) return null;
 
+  function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
   const handleRegisterWebPush = async (): Promise<any | null> => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       setWebPushStatus('Web Push not supported in this browser');
@@ -89,21 +100,37 @@ export default function NotificationSettingsModal({
       }
 
       // Register Service Worker
-      await navigator.serviceWorker.register('/sw.js');
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
       setWebPushStatus('Service Worker Active');
 
-      // Fetch VAPID key
+      // Fetch VAPID public key
       const keyRes = await fetch(`${API_BASE_URL}/api/notifications/vapid-public-key`);
-      if (keyRes.ok) {
-        const keyData = await keyRes.json();
-        return {
-          endpoint: 'browser_web_push_endpoint',
-          keys: { p256dh: 'browser_p256dh_key', auth: 'browser_auth_token' },
-          vapid_status: keyData.status,
-        };
+      if (!keyRes.ok) {
+        setWebPushStatus('Failed to retrieve VAPID key from backend');
+        return null;
       }
+      const keyData = await keyRes.json();
+      if (!keyData.public_key) {
+        setWebPushStatus('VAPID public key not configured on backend');
+        return null;
+      }
+
+      // Check existing PushSubscription or create new one
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey,
+        });
+      }
+
+      setWebPushStatus('PushSubscription Active');
+      return sub.toJSON();
     } catch (err: any) {
       console.warn('Web push registration notice:', err);
+      setWebPushStatus(`Push registration error: ${err.message || 'Unknown'}`);
     }
     return null;
   };
