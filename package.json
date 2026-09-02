@@ -8,8 +8,8 @@
     "dev:backend": "python -m uvicorn backend.main:app --reload --port 8000",
     "dev:frontend": "npm --prefix frontend run dev",
     "test:backend": "python -m unittest discover -s backend/tests -v",
-    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:frontend": "npm --prefix frontend run build",
     "lint": "npm --prefix frontend run lint",
-    "build": "cd frontend && npm install && npm run build"
+    "build": "npm --prefix frontend run build"
   }
 }
