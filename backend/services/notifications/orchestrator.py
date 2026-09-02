@@ -126,8 +126,8 @@ class NotificationOrchestrator:
             all_subs = await supabase_client.get_all_active_subscriptions()
 
         tasks = []
-        # Phase 1 active notification channels (SMS and Voice/IVR excluded in Phase 1)
-        PHASE_1_ACTIVE_CHANNELS = {NotificationChannel.WHATSAPP, NotificationChannel.WEB_PUSH}
+        # Phase 2 active notification channels (WhatsApp, Web Push, SMS active; Voice/IVR remains Phase 3)
+        PHASE_2_ACTIVE_CHANNELS = {NotificationChannel.WHATSAPP, NotificationChannel.WEB_PUSH, NotificationChannel.SMS}
 
         for sub in all_subs:
             if not sub.is_opted_in:
@@ -141,10 +141,11 @@ class NotificationOrchestrator:
             if not self._check_geographic_match(alert, sub):
                 continue
 
-            # 3. Schedule delivery tasks for Phase 1 active channels only
+            # 3. Schedule delivery tasks for Phase 2 active channels
             for channel in sub.enabled_channels:
-                if channel in PHASE_1_ACTIVE_CHANNELS:
+                if channel in PHASE_2_ACTIVE_CHANNELS:
                     tasks.append(self._process_single_delivery(alert, sub, channel))
+
 
         if not tasks:
             return []
@@ -387,11 +388,11 @@ class NotificationOrchestrator:
         - Does NOT enter the real emergency-alert pipeline.
         - Active in Phase 1 ONLY for WHATSAPP and WEB_PUSH.
         """
-        # Phase 1 Guard: Only WHATSAPP and WEB_PUSH are active
-        if channel in [NotificationChannel.SMS, NotificationChannel.VOICE_IVR]:
+        # Phase 2 Guard: Voice/IVR remains Phase 3
+        if channel == NotificationChannel.VOICE_IVR:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Channel '{channel.value}' is not active in Phase 1. Only WHATSAPP and WEB_PUSH are supported."
+                detail=f"Channel '{channel.value}' is not active in Phase 2. Voice/IVR remains Phase 3."
             )
 
         # 1. Fetch user subscription from Supabase to retrieve destination
@@ -411,8 +412,11 @@ class NotificationOrchestrator:
         recipient = None
         if channel == NotificationChannel.WHATSAPP:
             recipient = sub.whatsapp_number or sub.phone_number
+        elif channel == NotificationChannel.SMS:
+            recipient = sub.phone_number
         elif channel == NotificationChannel.WEB_PUSH:
             recipient = sub.user_identifier
+
 
         if not recipient:
             raise HTTPException(

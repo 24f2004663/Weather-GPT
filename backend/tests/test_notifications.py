@@ -669,39 +669,40 @@ class TestNotificationServices(unittest.TestCase):
         self.assertEqual(data["channel"], "WEB_PUSH")
         self.assertEqual(data["alert_id"], "TEST-NOTIFICATION")
 
-    def test_phase1_test_notification_sms_disabled_400(self):
+    def test_phase2_test_notification_sms_enabled(self):
         sub = NotificationSubscription(
             subscription_id="sub-test-3",
-            user_identifier="phase1_sms_user",
+            user_identifier="phase2_sms_user",
             phone_number="+919876543210",
             enabled_channels=[NotificationChannel.SMS],
             is_opted_in=True
         )
         asyncio.run(self.mock_supabase.save_subscription(sub))
 
-        # Triggering SMS in Phase 1 MUST return 400 Bad Request
+        # Triggering SMS in Phase 2 returns 200 OK
         res = self.client.post("/api/notifications/test", json={
-            "user_id": "phase1_sms_user",
+            "user_id": "phase2_sms_user",
             "channel": "SMS"
         })
-        self.assertEqual(res.status_code, 400)
-        self.assertIn("not active in Phase 1", res.json()["detail"])
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["channel"], "SMS")
 
-    def test_phase1_test_notification_voice_disabled_400(self):
+    def test_phase2_test_notification_voice_disabled_400(self):
         sub = NotificationSubscription(
             subscription_id="sub-test-4",
-            user_identifier="phase1_voice_user",
+            user_identifier="phase2_voice_user",
             phone_number="+919876543210",
             enabled_channels=[NotificationChannel.VOICE_IVR],
             is_opted_in=True
         )
         asyncio.run(self.mock_supabase.save_subscription(sub))
 
-        # Triggering Voice/IVR in Phase 1 MUST return 400 Bad Request
+        # Triggering Voice/IVR in Phase 2 MUST return 400 Bad Request
         res = self.client.post("/api/notifications/test", json={
-            "user_id": "phase1_voice_user",
+            "user_id": "phase2_voice_user",
             "channel": "VOICE_IVR"
         })
         self.assertEqual(res.status_code, 400)
-        self.assertIn("not active in Phase 1", res.json()["detail"])
+        self.assertIn("Voice/IVR remains Phase 3", res.json()["detail"])
+
 
