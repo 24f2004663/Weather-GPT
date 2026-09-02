@@ -15,7 +15,7 @@ export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: W
 
   const activeAlerts = alerts?.filter((a) => a.is_active) || [];
   const activeGdacs = gdacsAlerts?.filter((a) => a.is_active) || [];
-  const hasAlert = activeAlerts.length > 0 || activeGdacs.length > 0;
+  const primaryAlert = activeAlerts[0] || activeGdacs[0];
   const currentTemp = weather?.current?.temperature_c;
 
   // Simple static/interactive map view using public OpenStreetMap tiles or canvas representation
@@ -96,16 +96,16 @@ export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: W
         </div>
 
         {/* Floating Active Disaster Zone Indicator if alert present */}
-        {hasAlert && (
+        {primaryAlert && (
           <div className="absolute bottom-4 right-4 max-w-xs bg-rose-950/95 backdrop-blur-md border border-rose-800 p-3 rounded-2xl shadow-2xl text-xs space-y-1 text-rose-200">
             <div className="flex items-center space-x-1.5 font-bold text-rose-300">
               <span>⚠️ Active Disaster Region:</span>
               <span className="text-[10px] uppercase bg-rose-900 px-1.5 py-0.5 rounded font-mono">
-                {activeAlerts[0].scope}
+                {primaryAlert.scope}
               </span>
             </div>
             <p className="text-[11px] text-slate-200 leading-tight line-clamp-2">
-              {activeAlerts[0].affected_area}
+              {primaryAlert.affected_area}
             </p>
           </div>
         )}

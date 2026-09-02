@@ -7,6 +7,9 @@ export const metadata: Metadata = {
     'Next-generation meteorological intelligence, hyper-local forecasts, and official disaster safety advisories powered by Google Gemini and Open-Meteo.',
   keywords: ['weather', 'forecast', 'ai weather', 'climate', 'disaster alerts', 'gemini', 'open-meteo'],
   authors: [{ name: 'WeatherGPT Team' }],
+  icons: {
+    icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌤️</text></svg>',
+  },
 };
 
 export const viewport: Viewport = {
