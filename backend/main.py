@@ -212,6 +212,16 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ---------------------------------------------------------------------------
 # Public Health & Configuration Endpoints
 # ---------------------------------------------------------------------------
+@app.api_route("/", methods=["GET", "HEAD"], tags=["Root"])
+async def root_health():
+    """Root health check for Render and external monitoring probes."""
+    return {
+        "status": "healthy",
+        "project": settings.PROJECT_NAME,
+        "version": settings.PROJECT_VERSION,
+        "environment": settings.ENVIRONMENT,
+    }
+
 @app.get("/api/health", response_model=HealthResponse, tags=["Health"])
 async def health_check(response: FastAPIResponse):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -423,7 +433,7 @@ async def transcribe_audio_endpoint(
 @app.get("/api/notifications/preferences", response_model=Optional[NotificationSubscription], tags=["Notifications"])
 async def get_notification_preferences(
     response: FastAPIResponse,
-    user_id: str = Query(..., min_length=3, max_length=64, regex="^[a-zA-Z0-9_\\-\\.\\@]+$", description="User or client identifier")
+    user_id: str = Query(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-\.\@]+$", description="User or client identifier")
 ):
     response.headers["Cache-Control"] = "no-store, private"
     return await notification_orchestrator.get_subscription(user_identifier=user_id)
@@ -436,7 +446,7 @@ async def update_notification_preferences(request: SubscriptionRequest, response
 @app.delete("/api/notifications/preferences", tags=["Notifications"])
 async def unsubscribe_notifications(
     response: FastAPIResponse,
-    user_id: str = Query(..., min_length=3, max_length=64, regex="^[a-zA-Z0-9_\\-\\.\\@]+$", description="User or client identifier")
+    user_id: str = Query(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-\.\@]+$", description="User or client identifier")
 ):
     response.headers["Cache-Control"] = "no-store, private"
     success = await notification_orchestrator.delete_subscription(user_identifier=user_id)
