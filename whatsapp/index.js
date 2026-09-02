@@ -430,14 +430,19 @@ async function handleMessage(socket, msg) {
     log('chat_response', { phone_suffix: phoneSuffix, response_length: response.length });
 
     // 9. Send response back via WhatsApp
-    await socket.sendMessage(jid, { text: response });
+    const websiteUrl = 'https://weather-gpt-team-layers.vercel.app/';
+    const replyText = response.includes('weather-gpt-team-layers.vercel.app')
+      ? response
+      : `${response}\n\n🌐 Live Weather Dashboard: ${websiteUrl}`;
+
+    await socket.sendMessage(jid, { text: replyText });
     log('send', { type: 'chat_response', phone_suffix: phoneSuffix });
 
   } catch (err) {
     log('error', { reason: 'chat_api_failed', error: err.message, phone_suffix: phoneSuffix });
     try {
       await socket.sendMessage(jid, {
-        text: '🌧️ WeatherGPT is temporarily unable to process your request. Please try again in a moment.'
+        text: '🌧️ WeatherGPT is temporarily unable to process your request. Please check our live web portal: https://weather-gpt-team-layers.vercel.app/'
       });
       log('send', { type: 'error_reply', phone_suffix: phoneSuffix });
     } catch (sendErr) {

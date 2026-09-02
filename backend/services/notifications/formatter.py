@@ -13,7 +13,8 @@ def format_whatsapp_alert(alert: DisasterAlert, language: str = "en") -> str:
             f"📍 *प्रभावित क्षेत्र:* {alert.affected_area}\n"
             f"⏱️ *समय:* {time_str}\n"
             f"🛡️ *आधिकारिक सुरक्षा निर्देश:* {alert.instruction or 'सुरक्षित स्थान पर रहें।'}\n\n"
-            f"🏛️ *स्रोत:* SACHET / NDMA (आधिकारिक राष्ट्रीय फ़ीड)"
+            f"🏛️ *स्रोत:* SACHET / NDMA (आधिकारिक राष्ट्रीय फ़ीड)\n\n"
+            f"🌐 *वेबसाइट:* https://weather-gpt-team-layers.vercel.app/"
         )
     elif language == "ta":
         return (
@@ -23,7 +24,8 @@ def format_whatsapp_alert(alert: DisasterAlert, language: str = "en") -> str:
             f"📍 *பாதிக்கப்பட்ட பகுதி:* {alert.affected_area}\n"
             f"⏱️ *நேரம்:* {time_str}\n"
             f"🛡️ *அதிகாரப்பூர்வ வழிகாட்டல்:* {alert.instruction or 'பாதுகாப்பான இடங்களில் இருக்கவும்.'}\n\n"
-            f"🏛️ *மூலம்:* SACHET / NDMA"
+            f"🏛️ *மூலம்:* SACHET / NDMA\n\n"
+            f"🌐 *வலைத்தளம்:* https://weather-gpt-team-layers.vercel.app/"
         )
     elif language == "te":
         return (
@@ -33,7 +35,8 @@ def format_whatsapp_alert(alert: DisasterAlert, language: str = "en") -> str:
             f"📍 *ప్రభావిత ప్రాంతం:* {alert.affected_area}\n"
             f"⏱️ *సమయం:* {time_str}\n"
             f"🛡️ *రక్షణ సూచనలు:* {alert.instruction or 'సురక్షిత ప్రదేశాల్లో ఉండండి.'}\n\n"
-            f"🏛️ *మూలం:* SACHET / NDMA"
+            f"🏛️ *మూలం:* SACHET / NDMA\n\n"
+            f"🌐 *వెబ్‌సైట్:* https://weather-gpt-team-layers.vercel.app/"
         )
     elif language == "bn":
         return (
@@ -43,7 +46,8 @@ def format_whatsapp_alert(alert: DisasterAlert, language: str = "en") -> str:
             f"📍 *প্রভাবিত এলাকা:* {alert.affected_area}\n"
             f"⏱️ *সময়:* {time_str}\n"
             f"🛡️ *সরকারি নির্দেশিকা:* {alert.instruction or 'নিরাপদ স্থানে আশ্রয় নিন।'}\n\n"
-            f"🏛️ *উৎস:* SACHET / NDMA"
+            f"🏛️ *উৎস:* SACHET / NDMA\n\n"
+            f"🌐 *ওয়েবসাইট:* https://weather-gpt-team-layers.vercel.app/"
         )
     else: # Default English
         return (
@@ -53,7 +57,8 @@ def format_whatsapp_alert(alert: DisasterAlert, language: str = "en") -> str:
             f"📍 *Affected Area:* {alert.affected_area}\n"
             f"⏱️ *Issued:* {time_str}\n"
             f"🛡️ *Official Instruction:* {alert.instruction or 'Please follow local emergency management directives.'}\n\n"
-            f"🏛️ *Source:* SACHET / NDMA (Official Emergency Feed)"
+            f"🏛️ *Source:* SACHET / NDMA (Official Emergency Feed)\n\n"
+            f"🌐 *Live Dashboard:* https://weather-gpt-team-layers.vercel.app/"
         )
 
 def format_sms_alert(alert: DisasterAlert, language: str = "en") -> str:
