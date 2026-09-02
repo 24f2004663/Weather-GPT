@@ -50,15 +50,14 @@ class BaileysWhatsAppAdapter(BaseNotificationAdapter):
         # 2. Live Baileys Sidecar Dispatch
         logger.info(f"Executing Baileys WhatsApp alert dispatch to {clean_recipient}...")
 
-        # Option A: Remote Baileys HTTP Microservice (if URL configured)
+        # Option A: Remote Baileys HTTP Microservice (if WHATSAPP_BAILEYS_URL configured)
         baileys_url = getattr(settings, "WHATSAPP_BAILEYS_URL", None) or os.environ.get("WHATSAPP_BAILEYS_URL")
         if baileys_url:
             try:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
                     resp = await client.post(
                         f"{baileys_url.rstrip('/')}/send",
-                        json={"recipient": clean_recipient, "message": payload.message},
-                        headers={"x-api-key": getattr(settings, "WHATSAPP_INTERNAL_API_KEY", "")}
+                        json={"recipient": clean_recipient, "message": payload.message}
                     )
                     if resp.status_code in [200, 201, 202]:
                         return DeliveryStatus(
