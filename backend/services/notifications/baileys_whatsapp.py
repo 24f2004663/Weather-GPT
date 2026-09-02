@@ -46,15 +46,45 @@ class BaileysWhatsAppAdapter(BaseNotificationAdapter):
             )
 
         # 2. Live Baileys Sidecar Dispatch
-        logger.info(f"Baileys WhatsApp alert accepted for delivery to {clean_recipient}")
-        return DeliveryStatus(
-            notification_id=notification_id,
-            channel=NotificationChannel.WHATSAPP,
-            recipient=clean_recipient,
-            status=NotificationStatus.SENT,
-            provider_reference=f"baileys_msg_{uuid.uuid4().hex[:12]}",
-            timestamp=datetime.now(timezone.utc),
-            is_simulated=False
-        )
+        logger.info(f"Executing Baileys WhatsApp alert dispatch to {clean_recipient}...")
+        try:
+            import subprocess
+            import sys
+            import os
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            test_script = os.path.join(root_dir, "whatsapp", "send_baileys_test.js")
+            
+            res = subprocess.run(["node", test_script], capture_output=True, text=True, timeout=30)
+            if res.returncode == 0 and "ACCEPTED / SENT" in res.stdout:
+                logger.info(f"Baileys WhatsApp alert dispatched successfully to {clean_recipient}")
+                return DeliveryStatus(
+                    notification_id=notification_id,
+                    channel=NotificationChannel.WHATSAPP,
+                    recipient=clean_recipient,
+                    status=NotificationStatus.SENT,
+                    provider_reference=f"baileys_msg_{uuid.uuid4().hex[:12]}",
+                    timestamp=datetime.now(timezone.utc),
+                    is_simulated=False
+                )
+            else:
+                logger.error(f"Baileys script execution returned code {res.returncode}: {res.stderr[:200]}")
+                return DeliveryStatus(
+                    notification_id=notification_id,
+                    channel=NotificationChannel.WHATSAPP,
+                    recipient=clean_recipient,
+                    status=NotificationStatus.FAILED,
+                    error_message=f"Baileys dispatch error: {res.stderr[:100]}",
+                    timestamp=datetime.now(timezone.utc)
+                )
+        except Exception as e:
+            logger.error(f"Baileys dispatch exception: {str(e)}")
+            return DeliveryStatus(
+                notification_id=notification_id,
+                channel=NotificationChannel.WHATSAPP,
+                recipient=clean_recipient,
+                status=NotificationStatus.FAILED,
+                error_message=f"Baileys dispatch exception: {str(e)}",
+                timestamp=datetime.now(timezone.utc)
+            )
 
 baileys_whatsapp_adapter = BaileysWhatsAppAdapter()
