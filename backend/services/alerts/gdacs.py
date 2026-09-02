@@ -203,13 +203,13 @@ class GdacsAlertProvider(BaseAlertProvider):
         from_date = get_ns("fromdate", "gdacs", "")
         to_date = get_ns("todate", "gdacs", "")
         effective_time = self._parse_datetime(from_date) or issued_time
-        expires_time = self._parse_datetime(to_date)
 
+        # Note: gdacs:todate represents the observation/forecast episode end time,
+        # NOT the alert bulletin expiration. Bulletins present in the live RSS feed
+        # represent active disaster alerts.
+        expires_time = None
         is_active = True
-        if expires_time:
-            exp_aware = expires_time if expires_time.tzinfo else expires_time.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) > exp_aware:
-                is_active = False
+
 
         country_lower = country.lower()
         is_india = any(tok in country_lower for tok in INDIA_COUNTRY_TOKENS)

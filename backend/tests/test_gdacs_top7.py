@@ -18,6 +18,7 @@ SAMPLE_GDACS_RSS = """<?xml version="1.0" encoding="UTF-8"?>
       <gdacs:eventid>1001</gdacs:eventid>
       <gdacs:eventtype>FL</gdacs:eventtype>
       <gdacs:alertlevel>green</gdacs:alertlevel>
+      <gdacs:todate>Wed, 02 Sep 2026 03:00:00 GMT</gdacs:todate>
       <gdacs:country>Japan</gdacs:country>
       <georss:point>35.6762 139.6503</georss:point>
     </item>
@@ -28,6 +29,7 @@ SAMPLE_GDACS_RSS = """<?xml version="1.0" encoding="UTF-8"?>
       <gdacs:eventid>1002</gdacs:eventid>
       <gdacs:eventtype>TC</gdacs:eventtype>
       <gdacs:alertlevel>red</gdacs:alertlevel>
+      <gdacs:todate>Wed, 02 Sep 2026 04:00:00 GMT</gdacs:todate>
       <gdacs:country>India</gdacs:country>
       <georss:point>13.0827 80.2707</georss:point>
     </item>
@@ -77,6 +79,12 @@ class TestGdacsTop7Alerts(unittest.TestCase):
         # Global non-India events come after
         self.assertEqual(top7[2].alert_id, "gdacs-1003")  # Orange Earthquake in Chile
         self.assertEqual(top7[3].alert_id, "gdacs-1001")  # Green Flood in Japan
+
+    def test_todate_in_past_does_not_falsely_expire_live_rss_record(self):
+        alerts = self.provider.parse_feed_xml(SAMPLE_GDACS_RSS)
+        self.assertTrue(all(a.is_active for a in alerts))
+        top7 = self.provider.get_top_alerts(alerts, max_count=7)
+        self.assertEqual(len(top7), 4)
 
     def test_get_top_alerts_respects_max_count(self):
         alerts = self.provider.parse_feed_xml(SAMPLE_GDACS_RSS)
