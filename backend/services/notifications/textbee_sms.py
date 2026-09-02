@@ -73,7 +73,10 @@ class TextBeeSMSAdapter(BaseNotificationAdapter):
                 timestamp=datetime.now(timezone.utc),
             )
 
-        endpoint = f"{self.base_url}/gateway/send-sms"
+        base = self.base_url.rstrip("/")
+        if not base.endswith("/api/v1"):
+            base = f"{base}/api/v1"
+        endpoint = f"{base}/gateway/devices/{self.device_id}/send-sms"
         headers = {
             "x-api-key": self.api_key,
             "Content-Type": "application/json",
