@@ -122,7 +122,7 @@ export default function NotificationSettingsModal({
         const applicationServerKey = urlBase64ToUint8Array(keyData.public_key);
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: applicationServerKey,
+          applicationServerKey: applicationServerKey as any,
         });
       }
 
