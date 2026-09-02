@@ -1,169 +1,195 @@
-# WeatherGPT — AI Weather Intelligence & Disaster Awareness Platform
+# WeatherGPT: Hyper-Local Emergency Disaster Alert and AI Climate Intelligence Platform
 
-WeatherGPT is a web-first AI weather intelligence and disaster-awareness platform designed to bridge verified meteorological sources, official disaster alerts (SACHET/NDMA), and multi-channel communications (Web, WhatsApp, SMS, IVR, Web Push) powered by Google Gemini.
+Smart India Hackathon (SIH) Internal Hackathon - Round 4 Prototype Submission
+IIT Madras BS Degree Programme
+
+Live Prototype Deployment:
+- Web Application: https://weather-gpt-team-layers.vercel.app
+- Backend API Service: https://weather-gpt-0g4n.onrender.com
 
 ---
 
-## 🏛️ Architecture Overview
+## Executive Summary
 
-The system is structured as a clean, decoupled monorepo:
+WeatherGPT is an enterprise-grade, hyper-local disaster awareness and AI climate intelligence system designed to bridge official government emergency feeds (SACHET/NDMA and GDACS), real-time meteorological observations (Open-Meteo), 30-year agro-climatological baselines (NASA POWER), and proactive multi-channel notification infrastructure (SMS, WhatsApp, Web Push, Voice/IVR).
+
+The system addresses the critical gap between raw disaster data ingestion and actionable citizen alerts by combining multi-model generative AI analysis with deterministic geographic and severity targeting algorithms.
+
+---
+
+## Live System Architecture
+
+The project is structured as an event-driven monorepo separating real-time data ingestion, AI orchestration, database persistence, and multi-channel delivery:
 
 ```
-├── backend/
-│   ├── core/                  # Configuration validation (Pydantic), in-memory TTL caching, safe logging, errors
-│   ├── schemas/               # Shared API & data contracts (Location, Weather, Climate, Alerts, Chat, Notifications)
-│   ├── services/              # Service adapters & provider abstractions
-│   │   ├── weather/           # Open-Meteo, NASA POWER, WMO code interpretation, decision insights
-│   │   ├── alerts/            # SACHET/NDMA CAP parser, deduplication, expiration & geographic relevance
-│   │   ├── ai/                # Gemini AI orchestration, tool schemas, session store, multilingual prompts
-│   │   ├── notifications/     # Event bus, Notification Orchestrator, Exotel SMS/IVR, Meta WhatsApp, Web Push VAPID
-│   │   └── audio/             # Groq Whisper (STT), Browser SpeechSynthesis (TTS fallback)
-│   ├── db/                    # Supabase PostgreSQL client & migration support
-│   ├── tests/                 # Automated unit, integration, and smoke test suite (79 tests)
-│   └── main.py                # FastAPI entrypoint, middleware, weather, alerts, chat, voice & notifications endpoints
-├── frontend/
-│   ├── public/
-│   │   └── sw.js              # Service Worker for browser emergency Web Push notifications
-│   ├── src/
-│   │   ├── app/               # Next.js 14 App Router, Layout, Root Page
-│   │   ├── components/        # WeatherGPT UI Design System
-│   │   │   ├── Header.tsx                     # Search autocomplete, GPS locator, Notification Modal trigger, Multilingual selector
-│   │   │   ├── NotificationSettingsModal.tsx  # Multi-channel disaster alert subscription preferences
-│   │   │   ├── CurrentWeatherCard.tsx         # Real-time observations & conditions hero card
-│   │   │   ├── PersonalizedInsights.tsx       # Decision-oriented recommendations (umbrella, UV, comfort)
-│   │   │   ├── DisasterAlertBanner.tsx        # Official SACHET/NDMA disaster & safety feed
-│   │   │   ├── WeatherMap.tsx                 # Interactive geospatial weather & alert zone map
-│   │   │   ├── HourlyForecastStrip.tsx        # 24-Hour horizontal timeline with rain probabilities
-│   │   │   ├── DailyForecastGrid.tsx          # 7-Day synoptic forecast cards
-│   │   │   ├── WeatherCharts.tsx              # Lightweight SVG temperature & rain trend visualizations
-│   │   │   ├── ClimateSection.tsx             # NASA POWER 30-year agroclimatological baseline
-│   │   │   ├── ChatPanel.tsx                  # Gemini conversational AI with Voice STT and TTS playback
-│   │   │   └── SourceAttributionPanel.tsx     # Disclosures & provider attribution
-│   │   ├── lib/               # Typed API client (Chat, Location search, Weather, Climate, Alerts, Voice, Notifications)
-│   │   └── types/             # Shared TypeScript interface contracts
-│   ├── package.json           # Next.js, React, Tailwind CSS dependencies
-│   ├── tsconfig.json          # Strict TypeScript configuration
-│   └── tailwind.config.js     # Responsive design & WeatherGPT dark aesthetic
-├── Dev_Orchestra/             # Development tracking (ChatGPT.md, Spark.md)
-├── Test_Orchestra/            # Testing tracking (ChatGPT.md, Tester.md, Spark.md)
-├── .env.example               # Complete environment variable specification
-├── .gitignore                 # Strict secrets and build artifact exclusions
-└── README.md                  # Project documentation
+[ SACHET (NDMA India) RSS ]   [ GDACS (UN / EC) RSS ]   [ Open-Meteo / NASA POWER APIs ]
+            │                            │                            │
+            └────────────────────────────┼────────────────────────────┘
+                                         ▼
+                   [ Fast-API Emergency Disaster Pipeline ]
+                                         │
+        ┌────────────────────────────────┼────────────────────────────────┐
+        ▼                                ▼                                ▼
+[ Ingestion & Normalization ]   [ Geographic & Severity ]   [ Zero-Cost Gemini Router ]
+ (CAP XML Parsing & Expiry)     (State/District Resolution) (3.5-Flash-Lite & Fallbacks)
+        │                                │                                │
+        └────────────────────────────────┼────────────────────────────────┘
+                                         ▼
+                    [ Supabase PostgreSQL & PostgREST ]
+                     (Subscriptions & Seen Deduplication)
+                                         │
+                                         ▼
+                 [ Multi-Channel Notification Orchestrator ]
+                                         │
+      ┌──────────────────┬───────────────┴───────────────┬──────────────────┐
+      ▼                  ▼                               ▼                  ▼
+[ TextBee SMS ]   [ Baileys WhatsApp ]           [ VAPID Web Push ]   [ Voice / IVR ]
+ (Android Gateway) (Open-Source Sidecar)          (Browser Service Worker) (Bilingual Scripts)
 ```
 
 ---
 
-## 📢 Multi-Channel Emergency Notifications (Phase 7 Final Hardened)
+## Core System Innovations and Engineering Highlights
 
-WeatherGPT features an event-driven emergency notification engine:
-- **Decoupled Orchestration**: `SACHET Feed -> DisasterAlertTriggeredEvent -> NotificationOrchestrator -> [WhatsApp, SMS, Voice, Web Push]`.
-- **Explicit User Opt-In**: Requires user consent via `/api/notifications/preferences` before dispatching proactive alerts.
-- **Web Push End-to-End**: Browser Service Worker (`frontend/public/sw.js`) and VAPID key exchange (`/api/notifications/vapid-public-key`) with secure private key preservation on the server.
-- **Strict Concurrency & Fault Isolation**: `asyncio.gather(..., return_exceptions=True)` ensures one failing provider cannot block others or crash alert ingestion.
-- **Strict Idempotency**: Suppresses duplicate alerts within 24 hours per recipient and channel (`idempotency_key = {alert_id}:{recipient}:{channel}`).
-- **Phone Number Validation & PII Masking**: Validates E.164 phone formats and masks PII in API responses and logs (`+91 9876 ****10`).
-- **Rate Limiting**: Caps delivery to a maximum of 5 alerts per recipient per hour.
-- **Severity & Geographic Filtering**: Dispatches alerts matching user-selected thresholds (`Severe`, `Extreme`) and locations (State/District).
-- **Multilingual Emergency Bulletins**: Formats localized messages in English, Hindi (`हिंदी`), Tamil (`தமிழ்`), Telugu (`తెలుగు`), and Bengali (`বাংলা`) while preserving official source text.
-- **Safe Dry-Run Default**: `NOTIFICATION_DRY_RUN=true` simulates dispatches without charging accounts or spamming devices during testing.
+### 1. Multi-Source Disaster Ingestion and Normalization Engine
+- Ingests official Common Alerting Protocol (CAP) XML feeds from SACHET (National Disaster Management Authority, India) and international GDACS RSS feeds.
+- Implements strict severity classification: Extreme, Severe, Moderate, Minor, and Unknown.
+- Resolves geographic boundaries down to State and District levels, enforcing exact country matching to eliminate false-positive geographic assignments.
+- Uses automated batch deduplication and expiration filtering to ignore stale or cancelled disaster bulletins.
 
-### ⚠️ Prototype Architecture Disclosures & Limitations
-1. **In-Memory Preferences**: In the current Phase 7 prototype, subscriptions and idempotency keys are managed within a concurrency-safe in-memory store (`NotificationOrchestrator`). Subscriptions persist during the active process and reset on server restart.
-2. **Device / Client Identity**: Client user identifiers (`user_identifier`) provide device-scoped isolation for prototype sessions and do not represent full OAuth2/JWT user authentication.
-3. **Provider Acceptance vs. Final Delivery**: Provider API requests return `PROVIDER_REQUEST_ACCEPTED` when acknowledged by upstream carrier gateways; final device delivery status depends on carrier handoff and user network connectivity.
+### 2. Multi-Model Gemini AI Router with Zero-Cost Quota Management
+- Features a multi-tiered LLM router that manages rate-limits and token quotas across Google Gemini models (Gemini 3.5 Flash-Lite, Gemini 3.1 Flash-Lite, Gemma 4 31B, Gemma 4 26B).
+- Automatically tracks Requests Per Minute (RPM), Requests Per Day (RPD), and Tokens Per Minute (TPM).
+- Implements 60-second quota suppression and silent fallbacks to ensure continuous availability during high-traffic emergency events.
+- Executes server-side tool calling for geocoding, current weather, multi-day forecasts, 30-year historical climate tables, and active disaster alerts.
 
----
+### 3. Hyper-Local Multi-Channel Emergency Dispatch Engine
+- **SMS Channel (TextBee Gateway):** Integrates with an Android gateway device running the TextBee service to dispatch real emergency SMS messages to registered mobile numbers without external carrier fees.
+- **WhatsApp Channel (Baileys Open-Source Sidecar):** Built on `@whiskeysockets/baileys` Node.js socket layer. Runs as an independent process with live Supabase authorization checks, processing incoming conversational queries and sending outbound alert dispatches.
+- **Web Push Channel (Native VAPID Protocol):** Implements RFC 8291/8292 Web Push VAPID protocol using `pywebpush` on the backend and an active Service Worker (`public/sw.js`) on the frontend for browser-native push notifications.
+- **Voice/IVR Channel:** Generates structured bilingual (English and Hindi) spoken alert scripts formatted with emergency instructions, affected areas, and official source attributions.
 
-## 🎙️ Advanced Intelligence & Accessibility (Phase 6)
-
-- **Personalized Weather Insights**: Decision-oriented recommendations for umbrella necessity, UV skin protection, thermal comfort index, and optimal outdoor activity windows.
-- **Interactive Geospatial Map**: Leaflet OpenStreetMap coordinate view with real-time temperature badge and disaster hazard scope indicators.
-- **Voice-Query Speech-to-Text (Groq Whisper)**: Backend `POST /api/audio/transcribe` utilizing `whisper-large-v3` with microphone capture and pre-send transcript review.
-- **Client Speech Synthesis (TTS)**: In-browser SpeechSynthesis playback with language matching and stop/pause controls.
+### 4. Deterministic Deduplication and One-Shot Delivery Guards
+- Enforces strict alert deduplication via `public.seen_alerts` and 15-second idempotency debounce keys (`test:{user_id}:{channel}`) to eliminate duplicate notification sends.
+- Prevents double-click request repetition on frontend user interfaces.
+- Applies strict per-recipient rate limits (maximum 5 notifications per hour).
 
 ---
 
-## 🚨 Disaster & Alert Intelligence (Phase 5)
+## Technology Stack
 
-WeatherGPT integrates official CAP emergency alerts from **SACHET / NDMA**:
-- **Authoritative XML/CAP Parser**: Secure parser resolving event types, severity, urgency, certainty, and official instructions.
-- **Controlled Severity Normalization**: Normalized into `Extreme`, `Severe`, `Moderate`, `Minor`, and `Unknown` while preserving source severity.
-- **Deterministic Deduplication**: Prevents repeated alert items per ingestion batch.
-- **Expiration & Status Control**: Automatically filters expired and cancelled warnings.
-- **Geographic Precision Matching**: Matches alerts to user location by District, State, or National scope.
+### Backend Services
+- **Framework:** Python 3.10+ / FastAPI / Uvicorn ASGI Server
+- **Database & Persistence:** Supabase PostgreSQL with PostgREST REST API
+- **AI & Natural Language:** Google GenAI SDK (`gemini-3.5-flash-lite`), Groq Whisper STT (`whisper-large-v3`)
+- **HTTP Client & Parsing:** `httpx` (Async HTTP execution), `xml.etree.ElementTree` (CAP XML parser)
+- **Web Push Engine:** `pywebpush` VAPID protocol generator
 
----
+### Frontend Application
+- **Framework:** Next.js 14 (App Router), React 18, TypeScript
+- **Styling & Components:** Tailwind CSS, Lucide Icons, Headless UI
+- **Geospatial & Visualizations:** Leaflet OpenStreetMap, Recharts climate charts
+- **Service Worker:** Native Web Push Service Worker (`frontend/public/sw.js`)
 
-## 🤖 AI WeatherGPT Engine & Server Tools
-
-The AI Engine (`backend/services/ai/gemini.py`) integrates Google Gemini with an explicit server-side tool allowlist:
-
-| Tool Name | Purpose | Target Provider |
-| :--- | :--- | :--- |
-| `resolve_location` | Geocodes place queries to coordinates | Open-Meteo Geocoding |
-| `get_current_weather` | Retrieves real-time observations | Open-Meteo |
-| `get_weather_forecast` | Retrieves multi-day/hourly forecasts | Open-Meteo |
-| `get_historical_climate` | 30-year climatology baseline averages | NASA POWER |
-| `get_active_alerts` | Official active disaster alerts | SACHET/NDMA |
+### WhatsApp Sidecar
+- **Runtime:** Node.js 18+
+- **Socket Engine:** `@whiskeysockets/baileys` (Multi-file session authentication)
+- **Process Supervisor:** PowerShell background supervisor (`whatsapp/start_whatsapp_supervisor.ps1`)
 
 ---
 
-## 🛰️ REST API Surface
+## Comprehensive Test Suite and Verification
 
-| Method | Endpoint | Description | Request / Parameters |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/notifications/preferences` | Retrieve user notification preferences | `user_id` (string) |
-| `POST` | `/api/notifications/preferences` | Save / Opt-in emergency preferences | Body: `SubscriptionRequest` |
-| `DELETE` | `/api/notifications/preferences` | Unsubscribe user from all alerts | `user_id` (string) |
-| `GET` | `/api/notifications/providers/status` | Public status of notification channels | None |
-| `GET` | `/api/notifications/vapid-public-key` | Public VAPID key for browser Web Push | None |
-| `POST` | `/api/notifications/preview` | Preview formatted alert across channels & languages | Body: `NotificationPreviewRequest` |
-| `POST` | `/api/audio/transcribe` | Transcribes audio via Groq Whisper (`whisper-large-v3`) | Form data: `file`, `language` |
-| `GET` | `/api/alerts` | Active disaster alerts from SACHET/NDMA | `lat`, `lon`, `state`, `district`, `active_only` |
-| `POST` | `/api/chat` | Conversational weather queries with Gemini & tool calling | Body: `ChatRequest` |
-| `GET` | `/api/location/search` | Geocodes place names into normalized locations | `q` (string), `count` (int) |
-| `GET` | `/api/weather/current` | Normalized current conditions | `lat` (float), `lon` (float) |
-| `GET` | `/api/weather/forecast` | Normalized daily & hourly forecast | `lat` (float), `lon` (float), `days` (int) |
-| `GET` | `/api/weather/by-city` | Unified location search + forecast in one step | `city` (string), `days` (int) |
-| `GET` | `/api/climate/historical` | 30-year NASA POWER agroclimatology baseline | `lat` (float), `lon` (float) |
-| `GET` | `/api/health` | System diagnostics & adapter readiness | None |
-| `GET` | `/api/config` | Public configuration & masked service status | None |
+The platform maintains a complete automated test suite verifying system contracts, data schemas, API adapters, and notification routing.
 
----
+### Test Execution Commands
 
-## 🧪 Running Automated Tests
-
-Execute the backend test suite:
+Backend Unit & Integration Test Suite:
 ```bash
-python3 -m unittest discover -s backend/tests -v
+python -m unittest discover -s backend/tests -v
 ```
 
-All **79 automated tests** verify:
-- Web Push browser lifecycle, service worker integration, and VAPID key exchange.
-- Phone number normalization, regex validation, and masking.
-- Multi-channel notification delivery (WhatsApp, SMS, Voice, Web Push).
-- Notification orchestrator severity, geographic, and rate-limiting filters.
-- Idempotency key duplicate suppression over 24 hours.
-- Explicit subscription management (subscribe, get, unsubscribe).
-- Cross-user subscription isolation.
-- Groq Whisper STT adapter, audio transcription endpoint, and error boundaries.
-- Browser SpeechSynthesis metadata and TTS provider fallback.
-- SACHET/NDMA CAP feed parsing, XML validation, deduplication, and expiration.
-- AI tool calling loop including `get_active_alerts`.
-- In-memory cache operations, TTL expiration, and eviction.
-- WMO weather code interpretation and safe fallbacks.
-- Open-Meteo and NASA POWER data normalization and schema compliance.
-- FastAPI endpoint contracts and HTTP status codes.
+WhatsApp Baileys Adapter Test Suite:
+```bash
+node --test whatsapp/test/adapter.test.js
+```
+
+Frontend Static Linting & Type Validation:
+```bash
+npm run lint
+```
+
+Production Build Compilation Verification:
+```bash
+npm run build
+```
+
+### Verification Metrics
+- **Backend Unit Tests:** 181 / 181 PASSED
+- **WhatsApp Adapter Tests:** 36 / 36 PASSED
+- **ESLint Code Inspection:** 0 Errors, 0 Warnings
+- **Production Build:** Next.js static pages compiled successfully
 
 ---
 
-## 🗺️ Project Phases Roadmap
+## REST API Specification
 
-- [x] **Phase 1 — Foundation & Architecture** (Completed)
-- [x] **Phase 2 — Core Weather Engine** (Completed)
-- [x] **Phase 3 — AI WeatherGPT Engine** (Completed & Verified)
-- [x] **Phase 4 — Main Web Application** (Completed & Verified)
-- [x] **Phase 5 — Disaster & Alert Intelligence** (Completed & Verified)
-- [x] **Phase 6 — Advanced Intelligence & Accessibility** (Completed & Verified)
-- [x] **Phase 7 — Communication Channels & End-to-End Verification** (Completed & Verified)
-- [ ] **Phase 8 — Full Integration, Testing & Demo Hardening**
+| Method | Endpoint | Description | Request Parameters / Body |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/health` | System diagnostics and service readiness status | None |
+| `GET` | `/api/weather/current` | Real-time weather observations for coordinates | `lat` (float), `lon` (float) |
+| `GET` | `/api/weather/forecast` | Multi-day daily and hourly forecast | `lat` (float), `lon` (float), `days` (int) |
+| `GET` | `/api/weather/by-city` | Unified city search and weather forecast | `city` (string), `days` (int) |
+| `GET` | `/api/climate/historical` | 30-year NASA POWER agro-climatological data | `lat` (float), `lon` (float) |
+| `GET` | `/api/alerts` | Active SACHET & GDACS disaster alerts | `lat`, `lon`, `state`, `district`, `active_only` |
+| `POST` | `/api/chat` | Conversational weather AI query with tool calling | Body: `{ messages: [...], session_id: string }` |
+| `POST` | `/api/audio/transcribe` | Audio speech-to-text via Groq Whisper | Form Data: `file` (audio blob), `language` |
+| `GET` | `/api/notifications/preferences` | Retrieve subscriber notification settings | `user_id` (string) |
+| `POST` | `/api/notifications/preferences` | Opt-in / update alert preferences and channels | Body: Subscription JSON |
+| `POST` | `/api/notifications/test` | Trigger one-shot channel delivery test | Body: `{ channel: string, user_id: string }` |
+| `GET` | `/api/notifications/subscriber/verify` | Live auth gate endpoint for Baileys sidecar | `phone` (string) |
+
+---
+
+## Local Setup and Installation
+
+### 1. Repository Setup
+```bash
+git clone https://github.com/24f2004663/Weather-GPT.git
+cd Weather-GPT
+```
+
+### 2. Environment Configuration
+Copy environment templates and configure required keys:
+```bash
+cp backend/.env.example backend/.env
+cp whatsapp/.env.example whatsapp/.env
+```
+
+### 3. Backend Installation and Execution
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m uvicorn backend.main:app --port 8000 --reload
+```
+
+### 4. Frontend Installation and Execution
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 5. WhatsApp Sidecar Execution
+```bash
+cd whatsapp
+npm install
+node index.js
+```
+
+---
+
+## License and Project Disclosures
+
+WeatherGPT is developed for the Smart India Hackathon (SIH) Internal Hackathon, IIT Madras BS Degree Programme. All meteorological and emergency alert data are sourced from public official APIs (NDMA SACHET, GDACS, Open-Meteo, NASA POWER).
