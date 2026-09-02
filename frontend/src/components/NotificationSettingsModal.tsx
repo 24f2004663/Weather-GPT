@@ -174,6 +174,8 @@ export default function NotificationSettingsModal({
   };
 
   const handleRunChannelTest = async (channelKey: 'WHATSAPP' | 'WEB_PUSH' | 'SMS') => {
+    if (testState[channelKey]?.loading) return;
+
     setTestState((prev) => ({
       ...prev,
       [channelKey]: { loading: true, message: null, error: false },

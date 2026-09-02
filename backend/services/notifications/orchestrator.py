@@ -258,12 +258,12 @@ class NotificationOrchestrator:
 
         return False
 
-    async def _is_duplicate(self, idempotency_key: str) -> bool:
+    async def _is_duplicate(self, idempotency_key: str, ttl_seconds: float = 86400.0) -> bool:
         now = time.time()
         async with self._lock:
             if idempotency_key in self._sent_idempotency_keys:
                 last_sent = self._sent_idempotency_keys[idempotency_key]
-                if now - last_sent < 86400: # 24 hours deduplication window
+                if now - last_sent < ttl_seconds:
                     return True
             return False
 
@@ -425,6 +425,24 @@ class NotificationOrchestrator:
                 detail=f"No recipient details configured for channel '{channel.value}'."
             )
 
+        # Test Notification Debounce / Idempotency Guard (15 seconds window)
+        idempotency_key = f"test:{user_identifier}:{channel.value}"
+        if await self._is_duplicate(idempotency_key, ttl_seconds=15.0):
+            logger.warning(f"Duplicate test notification suppressed by idempotency key: {idempotency_key}")
+            return NotificationRecord(
+                notification_id=str(uuid.uuid4()),
+                alert_id="TEST-NOTIFICATION",
+                channel=channel,
+                recipient=mask_phone_number(recipient) or recipient,
+                status=NotificationStatus.SENT,
+                provider=self._get_provider_name(channel),
+                sent_at=datetime.utcnow(),
+                provider_message_id="debounced_duplicate_request",
+                error_message=None,
+                idempotency_key=idempotency_key,
+                dry_run=settings.NOTIFICATION_DRY_RUN
+            )
+
         # Fixed mandatory Phase 1 test message
         test_message = "You have subscribed to WeatherGPT.\nThis is a test message you triggered."
 
@@ -456,9 +474,11 @@ class NotificationOrchestrator:
             failed_at=datetime.utcnow() if not delivery_status or delivery_status.status == NotificationStatus.FAILED else None,
             provider_message_id=delivery_status.provider_reference if delivery_status else None,
             error_message=delivery_status.error_message if delivery_status else "Unhandled adapter exception",
-            idempotency_key=f"test:{user_identifier}:{channel.value}:{time.time()}",
+            idempotency_key=idempotency_key,
             dry_run=delivery_status.is_simulated if delivery_status else settings.NOTIFICATION_DRY_RUN
         )
+
+        await self._record_dispatch(idempotency_key, recipient, record)
         return record
 
 notification_orchestrator = NotificationOrchestrator()
