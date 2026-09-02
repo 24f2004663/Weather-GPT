@@ -434,23 +434,8 @@ class NotificationOrchestrator:
                 detail=f"No recipient details configured for channel '{channel.value}'."
             )
 
-        # Test Notification Debounce / Idempotency Guard (15 seconds window)
-        idempotency_key = f"test:{user_identifier}:{channel.value}"
-        if await self._is_duplicate(idempotency_key, ttl_seconds=15.0):
-            logger.warning(f"Duplicate test notification suppressed by idempotency key: {idempotency_key}")
-            return NotificationRecord(
-                notification_id=str(uuid.uuid4()),
-                alert_id="TEST-NOTIFICATION",
-                channel=channel,
-                recipient=mask_phone_number(recipient) or recipient,
-                status=NotificationStatus.SENT,
-                provider=self._get_provider_name(channel),
-                sent_at=datetime.utcnow(),
-                provider_message_id="debounced_duplicate_request",
-                error_message=None,
-                idempotency_key=idempotency_key,
-                dry_run=settings.NOTIFICATION_DRY_RUN
-            )
+        # Generate unique test idempotency key per manual request (no artificial suppression)
+        idempotency_key = f"test:{user_identifier}:{channel.value}:{uuid.uuid4().hex[:8]}"
 
         # Fixed mandatory Phase 1 test message
         test_message = "You have subscribed to WeatherGPT.\nThis is a test message you triggered."
