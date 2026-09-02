@@ -19,6 +19,7 @@ from backend.schemas.notifications import (
     mask_phone_number,
 )
 from backend.services.notifications.whatsapp import whatsapp_notification_adapter
+from backend.services.notifications.baileys_whatsapp import baileys_whatsapp_adapter
 from backend.services.notifications.exotel import exotel_sms_adapter
 from backend.services.notifications.textbee_sms import textbee_sms_adapter
 from backend.services.notifications.voice import exotel_voice_adapter
@@ -332,8 +333,11 @@ class NotificationOrchestrator:
 
     async def _dispatch_to_adapter(self, channel: NotificationChannel, payload: NotificationPayload):
         if channel == NotificationChannel.WHATSAPP:
-            if settings.WHATSAPP_PROVIDER.lower() == "twilio":
+            provider = settings.WHATSAPP_PROVIDER.lower()
+            if provider == "twilio":
                 return await twilio_whatsapp_adapter.send_notification(payload)
+            elif provider in ["baileys", "live_baileys"]:
+                return await baileys_whatsapp_adapter.send_notification(payload)
             return await whatsapp_notification_adapter.send_notification(payload)
         elif channel == NotificationChannel.SMS:
             if settings.SMS_PROVIDER.lower() == "exotel":
@@ -349,7 +353,12 @@ class NotificationOrchestrator:
 
     def _get_provider_name(self, channel: NotificationChannel) -> str:
         if channel == NotificationChannel.WHATSAPP:
-            return "Twilio WhatsApp" if settings.WHATSAPP_PROVIDER.lower() == "twilio" else "Meta WhatsApp Cloud API"
+            provider = settings.WHATSAPP_PROVIDER.lower()
+            if provider == "twilio":
+                return "Twilio WhatsApp"
+            elif provider in ["baileys", "live_baileys"]:
+                return "Baileys WhatsApp"
+            return "Meta WhatsApp Cloud API"
         elif channel == NotificationChannel.SMS:
             return "Exotel SMS" if settings.SMS_PROVIDER.lower() == "exotel" else "TextBee SMS"
         elif channel == NotificationChannel.VOICE_IVR:
