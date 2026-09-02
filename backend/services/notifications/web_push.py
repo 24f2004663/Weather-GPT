@@ -81,11 +81,22 @@ class WebPushNotificationAdapter(BaseNotificationAdapter):
         if payload.push_subscription and isinstance(payload.push_subscription, dict):
             try:
                 from pywebpush import webpush
+                import urllib.parse
+                
+                endpoint = payload.push_subscription.get("endpoint", "")
+                parsed_endpoint = urllib.parse.urlparse(endpoint)
+                aud_claim = f"{parsed_endpoint.scheme}://{parsed_endpoint.netloc}" if parsed_endpoint.scheme and parsed_endpoint.netloc else "https://fcm.googleapis.com"
+
+                vapid_claims = {
+                    "sub": self.claim_email or "mailto:admin@weathergpt.org",
+                    "aud": aud_claim,
+                }
+
                 res = webpush(
                     subscription_info=payload.push_subscription,
                     data=json.dumps(push_data),
                     vapid_private_key=self.private_key,
-                    vapid_claims={"sub": self.claim_email or "mailto:admin@weathergpt.org"}
+                    vapid_claims=vapid_claims
                 )
                 logger.info(f"Web Push VAPID dispatched successfully to {recipient}. Status: {res.status_code}")
                 return DeliveryStatus(
