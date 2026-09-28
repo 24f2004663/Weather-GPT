@@ -62,35 +62,27 @@ class GeminiModelRouter:
         return [
             GeminiModelConfig(
                 name=settings.GEMINI_MODEL_1,
-                display_name="Gemini 2.5 Flash",
+                display_name="Gemma 4 31B-IT",
                 priority=1,
-                safe_rpm=settings.GEMINI_FLASH_LITE_SAFE_RPM,
-                safe_rpd=settings.GEMINI_FLASH_LITE_SAFE_RPD,
-                safe_tpm=settings.GEMINI_FLASH_LITE_SAFE_TPM,
-            ),
-            GeminiModelConfig(
-                name=settings.GEMINI_MODEL_2,
-                display_name="Gemini 3.1 Flash Lite",
-                priority=2,
-                safe_rpm=settings.GEMINI_FLASH_LITE_31B_SAFE_RPM,
-                safe_rpd=settings.GEMINI_FLASH_LITE_31B_SAFE_RPD,
-                safe_tpm=settings.GEMINI_FLASH_LITE_31B_SAFE_TPM,
-            ),
-            GeminiModelConfig(
-                name=settings.GEMINI_MODEL_3,
-                display_name="Gemma 4 31B",
-                priority=3,
                 safe_rpm=settings.GEMMA_4_31B_SAFE_RPM,
                 safe_rpd=settings.GEMMA_4_31B_SAFE_RPD,
                 safe_tpm=settings.GEMMA_4_31B_SAFE_TPM,
             ),
             GeminiModelConfig(
-                name=settings.GEMINI_MODEL_4,
-                display_name="Gemma 4 26B",
-                priority=4,
+                name=settings.GEMINI_MODEL_2,
+                display_name="Gemma 4 26B-A4B-IT",
+                priority=2,
                 safe_rpm=settings.GEMMA_4_26B_SAFE_RPM,
                 safe_rpd=settings.GEMMA_4_26B_SAFE_RPD,
                 safe_tpm=settings.GEMMA_4_26B_SAFE_TPM,
+            ),
+            GeminiModelConfig(
+                name=settings.GEMINI_MODEL_3,
+                display_name="Gemini 3.1 Flash Lite",
+                priority=3,
+                safe_rpm=settings.GEMINI_FLASH_LITE_SAFE_RPM,
+                safe_rpd=settings.GEMINI_FLASH_LITE_SAFE_RPD,
+                safe_tpm=settings.GEMINI_FLASH_LITE_SAFE_TPM,
             ),
         ]
 

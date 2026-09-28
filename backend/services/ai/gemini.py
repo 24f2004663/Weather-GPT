@@ -111,8 +111,8 @@ class GeminiAIService(BaseAIService):
             response = None
             selected_model_config = None
 
-            # Fallback cascade loop for the current tool iteration if 429 occurs
-            max_model_fallbacks = 4
+            # Fallback cascade loop for the current tool iteration if temporary/upstream error occurs
+            max_model_fallbacks = len(gemini_model_router._models)
             for model_attempt in range(max_model_fallbacks):
                 selection = await gemini_model_router.select_and_reserve_model(
                     excluded_models=excluded_models_for_request,
@@ -128,7 +128,7 @@ class GeminiAIService(BaseAIService):
                     )
 
                 selected_model_config, _ = selection
-                clean_model = selected_model_config.name.replace("models/", "")
+                clean_model = selected_model_config.name.replace("models/", "").strip()
                 endpoint = f"{self.base_url}/models/{clean_model}:generateContent"
 
                 body = {
@@ -154,7 +154,7 @@ class GeminiAIService(BaseAIService):
                     logger.error(f"[Gemini API Network Error] Model {clean_model}: {str(e)}")
                     raise UpstreamProviderError(provider=f"Gemini API ({clean_model})", status_code=None, message=str(e))
 
-                if response.status_code in (429, 502, 503, 504):
+                if response.status_code in (404, 429, 502, 503, 504):
                     logger.warning(
                         f"[Gemini API] event={response.status_code} model={clean_model} action=temporary_suppress tool_iteration={iteration}"
                     )
@@ -168,7 +168,7 @@ class GeminiAIService(BaseAIService):
                 )
                 break  # Successful non-error response received
 
-            if response is None or response.status_code in (429, 502, 503, 504):
+            if response is None or response.status_code in (404, 429, 502, 503, 504):
                 final_status = response.status_code if response else 503
                 raise UpstreamProviderError(
                     provider="Gemini API",

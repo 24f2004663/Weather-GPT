@@ -51,7 +51,7 @@ class TestGeminiAlertMessageGenerator(unittest.TestCase):
     @patch("backend.services.ai.alert_message.settings")
     def test_successful_gemini_message_generation(self, mock_settings, mock_post):
         mock_settings.GEMINI_API_KEY = "test_key"
-        mock_settings.GEMINI_MODEL = "gemini-2.5-flash"
+        mock_settings.GEMINI_MODEL = "gemma-4-31b-it"
 
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -79,7 +79,7 @@ class TestGeminiAlertMessageGenerator(unittest.TestCase):
     @patch("backend.services.ai.alert_message.settings")
     def test_fallback_on_gemini_error(self, mock_settings, mock_post):
         mock_settings.GEMINI_API_KEY = "test_key"
-        mock_settings.GEMINI_MODEL = "gemini-2.5-flash"
+        mock_settings.GEMINI_MODEL = "gemma-4-31b-it"
         mock_post.side_effect = Exception("API rate limit")
 
         alert = create_sample_alert()

@@ -61,7 +61,16 @@ async def generate_alert_message(alert: DisasterAlert, language: str = "en") -> 
     user_prompt = f"Please reformat this official emergency bulletin into a clear user-facing emergency message in language code '{language}':\n\n{json.dumps(alert_summary, indent=2)}"
 
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+        api_key = settings.GEMINI_API_KEY.strip()
+        models_to_try = [settings.GEMINI_MODEL]
+        for attr in ("GEMINI_MODEL_1", "GEMINI_MODEL_2", "GEMINI_MODEL_3"):
+            val = getattr(settings, attr, None)
+            if isinstance(val, str) and val.strip():
+                models_to_try.append(val.strip())
+
+        seen = set()
+        cascade = [m for m in models_to_try if m and not (m in seen or seen.add(m))]
+
         payload = {
             "contents": [
                 {
@@ -79,18 +88,21 @@ async def generate_alert_message(alert: DisasterAlert, language: str = "en") -> 
         }
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(url, json=payload)
-            if res.status_code == 200:
-                data = res.json()
-                candidates = data.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts and "text" in parts[0]:
-                        msg = parts[0]["text"].strip()
-                        if msg:
-                            logger.info(f"[Gemini Alert] Message generated successfully for alert: {alert.alert_id}")
-                            return msg
-            logger.warning(f"[Gemini Alert] API returned HTTP {res.status_code}, using fallback template")
+            for model_name in cascade:
+                clean_model = model_name.replace("models/", "").strip()
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+                res = await client.post(url, json=payload)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and "text" in parts[0]:
+                            msg = parts[0]["text"].strip()
+                            if msg:
+                                logger.info(f"[Gemini Alert] Message generated successfully for alert: {alert.alert_id} using {clean_model}")
+                                return msg
+                logger.warning(f"[Gemini Alert] API returned HTTP {res.status_code} for {clean_model}, trying next model in cascade")
     except Exception as e:
         logger.error(f"[Gemini Alert] Exception generating message: {str(e)}, using fallback template")
 

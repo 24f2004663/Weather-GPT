@@ -45,31 +45,28 @@ class Settings(BaseSettings):
 
     # Primary LLM Provider & Multi-Model Quota Router
     GEMINI_API_KEY: Optional[str] = Field(default=None, env="GEMINI_API_KEY")
-    GEMINI_MODEL: str = Field(default="gemini-2.5-flash", env="GEMINI_MODEL")
+    GEMINI_MODEL: str = Field(default="gemma-4-31b-it", env="GEMINI_MODEL")
 
-    # Priority Model 1: Gemini 2.5 Flash
-    GEMINI_MODEL_1: str = Field(default="gemini-2.5-flash", env="GEMINI_MODEL_1")
-    GEMINI_FLASH_LITE_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_SAFE_RPM")
-    GEMINI_FLASH_LITE_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_SAFE_RPD")
-    GEMINI_FLASH_LITE_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_SAFE_TPM")
-
-    # Priority Model 2: Gemini 3.1 Flash Lite
-    GEMINI_MODEL_2: str = Field(default="gemini-3.1-flash-lite", env="GEMINI_MODEL_2")
-    GEMINI_FLASH_LITE_31B_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_31B_SAFE_RPM")
-    GEMINI_FLASH_LITE_31B_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_31B_SAFE_RPD")
-    GEMINI_FLASH_LITE_31B_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_31B_SAFE_TPM")
-
-    # Priority Model 3: Gemma 4 31B
-    GEMINI_MODEL_3: str = Field(default="gemma-4-31b", env="GEMINI_MODEL_3")
+    # Priority Model 1: Gemma 4 31B-IT
+    GEMINI_MODEL_1: str = Field(default="gemma-4-31b-it", env="GEMINI_MODEL_1")
     GEMMA_4_31B_SAFE_RPM: int = Field(default=25, env="GEMMA_4_31B_SAFE_RPM")
     GEMMA_4_31B_SAFE_RPD: int = Field(default=1000, env="GEMMA_4_31B_SAFE_RPD")
     GEMMA_4_31B_SAFE_TPM: int = Field(default=250000, env="GEMMA_4_31B_SAFE_TPM")
 
-    # Priority Model 4: Gemma 4 26B
-    GEMINI_MODEL_4: str = Field(default="gemma-4-26b", env="GEMINI_MODEL_4")
+    # Priority Model 2: Gemma 4 26B-A4B-IT
+    GEMINI_MODEL_2: str = Field(default="gemma-4-26b-a4b-it", env="GEMINI_MODEL_2")
     GEMMA_4_26B_SAFE_RPM: int = Field(default=25, env="GEMMA_4_26B_SAFE_RPM")
     GEMMA_4_26B_SAFE_RPD: int = Field(default=1000, env="GEMMA_4_26B_SAFE_RPD")
     GEMMA_4_26B_SAFE_TPM: int = Field(default=250000, env="GEMMA_4_26B_SAFE_TPM")
+
+    # Priority Model 3: Gemini 3.1 Flash Lite (Final Fallback)
+    GEMINI_MODEL_3: str = Field(default="gemini-3.1-flash-lite", env="GEMINI_MODEL_3")
+    GEMINI_FLASH_LITE_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_SAFE_RPM")
+    GEMINI_FLASH_LITE_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_SAFE_RPD")
+    GEMINI_FLASH_LITE_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_SAFE_TPM")
+
+    # Optional legacy / inactive model field kept for backward compatibility
+    GEMINI_MODEL_4: Optional[str] = Field(default=None, env="GEMINI_MODEL_4")
 
     # Quota Suppression Duration on 429
     GEMINI_429_SUPPRESS_SECONDS: int = Field(default=60, env="GEMINI_429_SUPPRESS_SECONDS")
@@ -159,6 +156,32 @@ class Settings(BaseSettings):
             "nasa_power": bool(self.NASA_POWER_BASE_URL),
             "sachet_ndma": bool(self.SACHET_NDMA_ALERT_FEED_URL),
         }
+
+    def __init__(self, **values: Any):
+        super().__init__(**values)
+        if self.GEMINI_API_KEY:
+            object.__setattr__(self, "GEMINI_API_KEY", self.GEMINI_API_KEY.strip())
+        if self.GEMINI_MODEL:
+            object.__setattr__(self, "GEMINI_MODEL", self.GEMINI_MODEL.strip())
+        if self.GEMINI_MODEL_1:
+            object.__setattr__(self, "GEMINI_MODEL_1", self.GEMINI_MODEL_1.strip())
+        if self.GEMINI_MODEL_2:
+            object.__setattr__(self, "GEMINI_MODEL_2", self.GEMINI_MODEL_2.strip())
+        if self.GEMINI_MODEL_3:
+            object.__setattr__(self, "GEMINI_MODEL_3", self.GEMINI_MODEL_3.strip())
+        if self.GEMINI_MODEL_4:
+            object.__setattr__(self, "GEMINI_MODEL_4", self.GEMINI_MODEL_4.strip())
+
+        # Prohibited models protection: automatically remap deprecated models if present in env
+        PROHIBITED_MODELS = {"gemini-2.5-flash", "gemma-4-31b", "gemma-4-26b"}
+        if self.GEMINI_MODEL in PROHIBITED_MODELS:
+            object.__setattr__(self, "GEMINI_MODEL", "gemma-4-31b-it")
+        if self.GEMINI_MODEL_1 in PROHIBITED_MODELS:
+            object.__setattr__(self, "GEMINI_MODEL_1", "gemma-4-31b-it")
+        if self.GEMINI_MODEL_2 in PROHIBITED_MODELS:
+            object.__setattr__(self, "GEMINI_MODEL_2", "gemma-4-26b-a4b-it")
+        if self.GEMINI_MODEL_3 in PROHIBITED_MODELS:
+            object.__setattr__(self, "GEMINI_MODEL_3", "gemini-3.1-flash-lite")
 
 
 settings = Settings()
