@@ -45,10 +45,10 @@ class Settings(BaseSettings):
 
     # Primary LLM Provider & Multi-Model Quota Router
     GEMINI_API_KEY: Optional[str] = Field(default=None, env="GEMINI_API_KEY")
-    GEMINI_MODEL: str = Field(default="gemini-3.5-flash-lite", env="GEMINI_MODEL")
+    GEMINI_MODEL: str = Field(default="gemini-2.5-flash", env="GEMINI_MODEL")
 
-    # Priority Model 1: Gemini 3.5 Flash Lite
-    GEMINI_MODEL_1: str = Field(default="gemini-3.5-flash-lite", env="GEMINI_MODEL_1")
+    # Priority Model 1: Gemini 2.5 Flash
+    GEMINI_MODEL_1: str = Field(default="gemini-2.5-flash", env="GEMINI_MODEL_1")
     GEMINI_FLASH_LITE_SAFE_RPM: int = Field(default=12, env="GEMINI_FLASH_LITE_SAFE_RPM")
     GEMINI_FLASH_LITE_SAFE_RPD: int = Field(default=1000, env="GEMINI_FLASH_LITE_SAFE_RPD")
     GEMINI_FLASH_LITE_SAFE_TPM: int = Field(default=250000, env="GEMINI_FLASH_LITE_SAFE_TPM")

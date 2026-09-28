@@ -2,12 +2,14 @@
 
 import React from 'react';
 import { HourlyForecast } from '../types';
+import { t } from '../lib/translations';
 
 interface HourlyForecastStripProps {
   hourly: HourlyForecast[];
+  currentLanguage?: string;
 }
 
-export default function HourlyForecastStrip({ hourly }: HourlyForecastStripProps) {
+export default function HourlyForecastStrip({ hourly, currentLanguage = 'en' }: HourlyForecastStripProps) {
   if (!hourly || hourly.length === 0) {
     return null;
   }
@@ -42,11 +44,11 @@ export default function HourlyForecastStrip({ hourly }: HourlyForecastStripProps
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-            Hourly Timeline (Next 24h)
+            {t('timeline24h', currentLanguage)}
           </h3>
-          <p className="text-xs text-slate-400">Hourly temperature and precipitation probability</p>
+          <p className="text-xs text-slate-400">{t('timelineSub', currentLanguage)}</p>
         </div>
-        <span className="text-xs text-sky-400 font-mono">Horizontal Scroll →</span>
+        <span className="text-xs text-sky-400 font-mono">{t('horizontalScroll', currentLanguage)}</span>
       </div>
 
       {/* Horizontal Scroll Strip */}

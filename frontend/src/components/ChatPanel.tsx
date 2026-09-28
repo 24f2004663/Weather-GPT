@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, ChatResponse, LocationResult } from '../types';
 import { sendChatMessage, transcribeAudio } from '../lib/api';
+import { t } from '../lib/translations';
 
 interface ChatPanelProps {
   selectedLocation: LocationResult | null;
@@ -20,8 +21,7 @@ export default function ChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content:
-        "Hello! I am WeatherGPT, your AI weather intelligence assistant. Ask me anything about current conditions, rain forecasts, travel weather, disaster warnings, or long-term climate baselines.",
+      content: t('chatWelcomeMessage', currentLanguage),
       source_attribution: ['WeatherGPT Engine'],
     },
   ]);
@@ -30,6 +30,22 @@ export default function ChatPanel({
   const [sessionId, setSessionId] = useState<string>('');
   const [referencedData, setReferencedData] = useState<Record<string, any> | null>(null);
   const [showReferenced, setShowReferenced] = useState(false);
+
+  // Update initial greeting when language changes if no conversation has started yet
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].role === 'assistant' && !sessionId) {
+        return [
+          {
+            role: 'assistant',
+            content: t('chatWelcomeMessage', currentLanguage),
+            source_attribution: ['WeatherGPT Engine'],
+          },
+        ];
+      }
+      return prev;
+    });
+  }, [currentLanguage, sessionId]);
 
   const handleWhatsAppClick = () => {
     if (isAlertSubscribed) {
@@ -151,8 +167,7 @@ export default function ChatPanel({
     setMessages([
       {
         role: 'assistant',
-        content:
-          "Conversation reset. How can I assist you with weather intelligence today?",
+        content: t('chatWelcomeMessage', currentLanguage),
         source_attribution: ['WeatherGPT Engine'],
       },
     ]);
@@ -255,10 +270,10 @@ export default function ChatPanel({
   };
 
   const quickPrompts = [
-    selectedLocation ? `Will it rain today in ${selectedLocation.name}?` : 'Will it rain today?',
-    selectedLocation ? `Should I carry an umbrella in ${selectedLocation.name}?` : 'Should I carry an umbrella?',
-    selectedLocation ? `Are there any active disaster warnings for ${selectedLocation.name}?` : 'Active disaster alerts',
-    selectedLocation ? `What is the 30-year climate baseline for ${selectedLocation.name}?` : 'Historical climate baseline',
+    selectedLocation ? `${t('quickPromptRain', currentLanguage)} (${selectedLocation.name})` : t('quickPromptRain', currentLanguage),
+    selectedLocation ? `${t('quickPromptUmbrella', currentLanguage)} (${selectedLocation.name})` : t('quickPromptUmbrella', currentLanguage),
+    selectedLocation ? `${t('quickPromptAlerts', currentLanguage)} (${selectedLocation.name})` : t('quickPromptAlerts', currentLanguage),
+    selectedLocation ? `${t('quickPromptClimate', currentLanguage)} (${selectedLocation.name})` : t('quickPromptClimate', currentLanguage),
   ];
 
   return (
@@ -271,11 +286,11 @@ export default function ChatPanel({
           </div>
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <span>WeatherGPT Intelligence Assistant</span>
+              <span>{t('aiAssistant', currentLanguage)}</span>
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
             </h3>
             <p className="text-[11px] text-slate-400">
-              Grounded in Open-Meteo, NASA POWER, and SACHET/NDMA
+              {t('aiSub', currentLanguage)}
             </p>
           </div>
         </div>
@@ -287,16 +302,16 @@ export default function ChatPanel({
               onClick={() => setShowReferenced(!showReferenced)}
               className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 font-mono text-[11px] border border-slate-700 transition-colors"
             >
-              {showReferenced ? 'Hide Provenance' : 'View Provenance'}
+              {showReferenced ? t('hideProvenance', currentLanguage) : t('viewProvenance', currentLanguage)}
             </button>
           )}
           <button
             type="button"
             onClick={handleResetChat}
             className="text-slate-400 hover:text-slate-200 transition-colors text-xs font-medium"
-            title="Reset conversation"
+            title={t('resetConversation', currentLanguage)}
           >
-            Clear
+            {t('clearChat', currentLanguage)}
           </button>
         </div>
       </div>
@@ -304,7 +319,7 @@ export default function ChatPanel({
       {/* Provenance Data Viewer Overlay */}
       {showReferenced && referencedData && (
         <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 max-h-40 overflow-y-auto">
-          <div className="font-bold text-sky-400 mb-1">Referenced Structured Meteorological Payload:</div>
+          <div className="font-bold text-sky-400 mb-1">{t('referencedPayload', currentLanguage)}</div>
           <pre className="text-[10px] leading-relaxed whitespace-pre-wrap">{JSON.stringify(referencedData, null, 2)}</pre>
         </div>
       )}
@@ -337,9 +352,9 @@ export default function ChatPanel({
               {msg.role === 'assistant' && (
                 <div className="mt-2.5 pt-1.5 border-t border-slate-800/60 text-[10px] text-slate-400 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 truncate">
-                    <span className="text-slate-500">Sources:</span>
+                    <span className="text-slate-500">{t('sourcesLabel', currentLanguage)}</span>
                     <span className="font-medium text-sky-300 truncate">
-                      {msg.source_attribution?.join(' • ') || 'Verified Feeds'}
+                      {msg.source_attribution?.join(' • ') || t('verifiedFeeds', currentLanguage)}
                     </span>
                   </div>
 
@@ -348,9 +363,9 @@ export default function ChatPanel({
                     type="button"
                     onClick={() => handleToggleSpeak(msg.content, idx)}
                     className="flex-shrink-0 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px] border border-slate-700 transition-colors flex items-center gap-1"
-                    title="Read response aloud"
+                    title={t('readAloudTitle', currentLanguage)}
                   >
-                    <span>{speakingIdx === idx ? '⏹️ Stop' : '🔊 Listen'}</span>
+                    <span>{speakingIdx === idx ? t('stopListening', currentLanguage) : t('readAloud', currentLanguage)}</span>
                   </button>
                 </div>
               )}
@@ -361,14 +376,14 @@ export default function ChatPanel({
         {isLoading && (
           <div className="flex items-center space-x-2 text-xs text-slate-400 bg-slate-950/50 p-3 rounded-2xl max-w-xs border border-slate-800/80">
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping"></span>
-            <span>Querying weather feeds and analyzing...</span>
+            <span>{t('queryingWeather', currentLanguage)}</span>
           </div>
         )}
 
         {isTranscribing && (
           <div className="flex items-center space-x-2 text-xs text-sky-300 bg-slate-950/50 p-3 rounded-2xl max-w-xs border border-sky-800/80">
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping"></span>
-            <span>Transcribing speech with Groq Whisper...</span>
+            <span>{t('transcribingSpeech', currentLanguage)}</span>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -397,12 +412,12 @@ export default function ChatPanel({
           value={inputPrompt}
           onChange={(e) => setInputPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isRecording ? 'Listening to your voice...' : 'Ask a weather question or tap the mic...'}
+          placeholder={isRecording ? t('listeningVoice', currentLanguage) : t('typeMessage', currentLanguage)}
           disabled={isLoading || isRecording}
           className={`w-full bg-slate-950 border focus:border-sky-500 rounded-2xl px-4 py-2.5 pr-28 text-sm text-white placeholder-slate-500 focus:outline-none resize-none transition-colors ${
             isRecording ? 'border-rose-500 bg-rose-950/20 animate-pulse' : 'border-slate-800'
           }`}
-          aria-label="Message WeatherGPT"
+          aria-label={t('aiAssistant', currentLanguage)}
         />
 
         <div className="absolute right-3 bottom-5 flex items-center space-x-2">
@@ -416,7 +431,7 @@ export default function ChatPanel({
                 ? 'bg-rose-600 text-white animate-bounce shadow-lg shadow-rose-600/30'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
             }`}
-            title={isRecording ? 'Stop recording' : 'Voice input (Groq Whisper)'}
+            title={isRecording ? t('stopRecording', currentLanguage) : t('voiceInput', currentLanguage)}
           >
             <span>{isRecording ? '⏹️' : '🎙️'}</span>
           </button>
@@ -428,7 +443,7 @@ export default function ChatPanel({
             disabled={isLoading || isRecording || !inputPrompt.trim()}
             className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-semibold px-3.5 py-1.5 rounded-xl text-xs transition-all shadow-lg shadow-sky-600/20"
           >
-            Send
+            {t('send', currentLanguage)}
           </button>
         </div>
       </div>
@@ -442,19 +457,19 @@ export default function ChatPanel({
             </div>
             <div className="min-w-0">
               <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
-                <span>Try our WhatsApp Chatbot</span>
+                <span>{t('tryWhatsAppChatbot', currentLanguage)}</span>
                 {isAlertSubscribed ? (
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    Active
+                    {t('activeStatus', currentLanguage)}
                   </span>
                 ) : (
                   <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-800">
-                    Alerts Required
+                    {t('alertsRequired', currentLanguage)}
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-slate-400 truncate">
-                Chat with WeatherGPT on WhatsApp
+                {t('chatWithWhatsAppDesc', currentLanguage)}
               </p>
             </div>
           </div>
@@ -464,7 +479,7 @@ export default function ChatPanel({
             onClick={handleWhatsAppClick}
             className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1"
           >
-            <span>Try WhatsApp</span>
+            <span>{t('tryWhatsAppButton', currentLanguage)}</span>
             <span className="text-[10px]">↗</span>
           </button>
         </div>

@@ -2,15 +2,23 @@
 
 import React, { useState } from 'react';
 import { LocationResult, NormalizedWeatherResponse, DisasterAlert } from '../types';
+import { t } from '../lib/translations';
 
 interface WeatherMapProps {
   location: LocationResult;
   weather: NormalizedWeatherResponse | null;
   alerts: DisasterAlert[] | null;
   gdacsAlerts?: DisasterAlert[] | null;
+  currentLanguage?: string;
 }
 
-export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: WeatherMapProps) {
+export default function WeatherMap({
+  location,
+  weather,
+  alerts,
+  gdacsAlerts,
+  currentLanguage = 'en',
+}: WeatherMapProps) {
   const [zoom, setZoom] = useState<number>(10);
 
   const activeAlerts = alerts?.filter((a) => a.is_active) || [];
@@ -38,10 +46,10 @@ export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: W
           </div>
           <div>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              Interactive Geospatial Weather & Alert Map
+              {t('interactiveMapTitle', currentLanguage)}
             </h3>
             <p className="text-xs text-slate-400">
-              Visual coordinates, regional boundary context, and active hazard radius
+              {t('interactiveMapSubtitle', currentLanguage)}
             </p>
           </div>
         </div>
@@ -51,18 +59,18 @@ export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: W
             type="button"
             onClick={() => setZoom(Math.max(zoom - 2, 4))}
             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-            title="Zoom out"
+            title={t('zoomOut', currentLanguage)}
           >
-            - Zoom
+            {t('zoomOut', currentLanguage)}
           </button>
-          <span className="text-slate-400">Level {zoom}</span>
+          <span className="text-slate-400">{t('zoomLevel', currentLanguage)} {zoom}</span>
           <button
             type="button"
             onClick={() => setZoom(Math.min(zoom + 2, 16))}
             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
-            title="Zoom in"
+            title={t('zoomIn', currentLanguage)}
           >
-            + Zoom
+            {t('zoomIn', currentLanguage)}
           </button>
         </div>
       </div>
@@ -99,7 +107,7 @@ export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: W
         {primaryAlert && (
           <div className="absolute bottom-4 right-4 max-w-xs bg-rose-950/95 backdrop-blur-md border border-rose-800 p-3 rounded-2xl shadow-2xl text-xs space-y-1 text-rose-200">
             <div className="flex items-center space-x-1.5 font-bold text-rose-300">
-              <span>⚠️ Active Disaster Region:</span>
+              <span>{t('activeDisasterRegion', currentLanguage)}</span>
               <span className="text-[10px] uppercase bg-rose-900 px-1.5 py-0.5 rounded font-mono">
                 {primaryAlert.scope}
               </span>
@@ -112,8 +120,8 @@ export default function WeatherMap({ location, weather, alerts, gdacsAlerts }: W
       </div>
 
       <div className="flex flex-wrap items-center justify-between text-[10px] font-mono text-slate-500 gap-2">
-        <span>Cartography: OpenStreetMap Contributors • Coordinate Reference System: WGS-84</span>
-        <span>Geographic precision matches official SACHET/NDMA regional boundaries.</span>
+        <span>{t('mapCartographyAttribution', currentLanguage)}</span>
+        <span>{t('mapPrecisionAttribution', currentLanguage)}</span>
       </div>
     </div>
   );

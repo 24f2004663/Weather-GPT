@@ -2,12 +2,14 @@
 
 import React from 'react';
 import { DailyForecast } from '../types';
+import { t } from '../lib/translations';
 
 interface DailyForecastGridProps {
   daily: DailyForecast[];
+  currentLanguage?: string;
 }
 
-export default function DailyForecastGrid({ daily }: DailyForecastGridProps) {
+export default function DailyForecastGrid({ daily, currentLanguage = 'en' }: DailyForecastGridProps) {
   if (!daily || daily.length === 0) {
     return null;
   }
@@ -42,9 +44,9 @@ export default function DailyForecastGrid({ daily }: DailyForecastGridProps) {
       <div className="flex justify-between items-center">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-            7-Day Synoptic Forecast
+            {t('forecast7d', currentLanguage)}
           </h3>
-          <p className="text-xs text-slate-400">Multi-day high/low projections and rain probability</p>
+          <p className="text-xs text-slate-400">{t('multiDayProjections', currentLanguage)}</p>
         </div>
       </div>
 

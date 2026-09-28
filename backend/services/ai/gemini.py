@@ -154,9 +154,9 @@ class GeminiAIService(BaseAIService):
                     logger.error(f"[Gemini API Network Error] Model {clean_model}: {str(e)}")
                     raise UpstreamProviderError(provider=f"Gemini API ({clean_model})", status_code=None, message=str(e))
 
-                if response.status_code == 429:
+                if response.status_code in (429, 502, 503, 504):
                     logger.warning(
-                        f"[Gemini API] event=429 model={clean_model} action=temporary_suppress tool_iteration={iteration}"
+                        f"[Gemini API] event={response.status_code} model={clean_model} action=temporary_suppress tool_iteration={iteration}"
                     )
                     await gemini_model_router.record_429(selected_model_config.name)
                     excluded_models_for_request.add(selected_model_config.name)
@@ -166,13 +166,14 @@ class GeminiAIService(BaseAIService):
                 logger.info(
                     f"[Gemini API] event=response model={clean_model} status={response.status_code} tool_iteration={iteration}"
                 )
-                break  # Successful non-429 response received
+                break  # Successful non-error response received
 
-            if response is None or response.status_code == 429:
+            if response is None or response.status_code in (429, 502, 503, 504):
+                final_status = response.status_code if response else 503
                 raise UpstreamProviderError(
                     provider="Gemini API",
-                    status_code=429,
-                    message="WeatherGPT AI service reached rate limits across all configured models. Please retry in 1 minute."
+                    status_code=final_status,
+                    message=f"WeatherGPT AI service reached capacity/upstream limits (HTTP {final_status}) across all configured models. Please retry in 1 minute."
                 )
 
             if response.status_code != 200:

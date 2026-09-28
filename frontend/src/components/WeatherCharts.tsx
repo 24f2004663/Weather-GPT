@@ -2,13 +2,15 @@
 
 import React, { useState } from 'react';
 import { HourlyForecast, DailyForecast } from '../types';
+import { t } from '../lib/translations';
 
 interface WeatherChartsProps {
   hourly: HourlyForecast[];
   daily: DailyForecast[];
+  currentLanguage?: string;
 }
 
-export default function WeatherCharts({ hourly, daily }: WeatherChartsProps) {
+export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }: WeatherChartsProps) {
   const [activeTab, setActiveTab] = useState<'temp' | 'precip' | '7day'>('temp');
 
   if (!hourly || hourly.length === 0) {
@@ -46,9 +48,9 @@ export default function WeatherCharts({ hourly, daily }: WeatherChartsProps) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-            Meteorological Trends
+            {t('meteorologicalTrends', currentLanguage)}
           </h3>
-          <p className="text-xs text-slate-400">Visualized hourly and synoptic projections</p>
+          <p className="text-xs text-slate-400">{t('trendsSubtitle', currentLanguage)}</p>
         </div>
 
         {/* Tab Controls */}
@@ -62,7 +64,7 @@ export default function WeatherCharts({ hourly, daily }: WeatherChartsProps) {
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Hourly Temp (°C)
+            {t('hourlyTemp', currentLanguage)}
           </button>
           <button
             type="button"
@@ -73,7 +75,7 @@ export default function WeatherCharts({ hourly, daily }: WeatherChartsProps) {
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Rain Probability (%)
+            {t('rainProbability', currentLanguage)}
           </button>
           <button
             type="button"
@@ -84,7 +86,7 @@ export default function WeatherCharts({ hourly, daily }: WeatherChartsProps) {
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            7-Day Max / Min
+            {t('sevenDayMinMax', currentLanguage)}
           </button>
         </div>
       </div>

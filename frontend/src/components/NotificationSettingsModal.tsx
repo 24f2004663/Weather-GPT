@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { LocationResult } from '../types';
 import { API_BASE_URL, sendTestNotification } from '../lib/api';
+import { t } from '../lib/translations';
 
 interface NotificationSettingsModalProps {
   isOpen: boolean;
@@ -244,8 +245,8 @@ export default function NotificationSettingsModal({
               🚨
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Emergency Alert Preferences</h3>
-              <p className="text-xs text-slate-400">SACHET/NDMA & GDACS Emergency Disaster Warnings — Phase 2</p>
+              <h3 className="text-lg font-bold text-white">{t('emergencyAlertPreferences', currentLanguage)}</h3>
+              <p className="text-xs text-slate-400">{t('modalSubtitle', currentLanguage)}</p>
             </div>
           </div>
           <button
@@ -270,15 +271,15 @@ export default function NotificationSettingsModal({
             <span className={`h-3.5 w-3.5 rounded-full ${isSubscribed ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
             <div>
               <span className="font-bold text-white">
-                Status: {isSubscribed ? 'Opted In (Active Subscriber)' : 'Not Subscribed'}
+                {t('statusLabel', currentLanguage)} {isSubscribed ? t('optedInActive', currentLanguage) : t('notSubscribed', currentLanguage)}
               </span>
               <p className="text-[11px] text-slate-400">
-                Authoritative Supabase persistence enabled
+                {t('authoritativePersistence', currentLanguage)}
               </p>
             </div>
           </div>
           <span className="px-3 py-1 rounded-lg bg-sky-950 text-sky-300 font-mono text-[11px] font-bold border border-sky-800">
-            Phase 2 Pipeline (WhatsApp + Web Push + SMS)
+            {t('phase2Pipeline', currentLanguage)}
           </span>
         </div>
 
@@ -286,7 +287,7 @@ export default function NotificationSettingsModal({
         <div className="space-y-6 text-xs">
           {/* Phone Number */}
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-200 text-sm">Mobile / WhatsApp Number</label>
+            <label className="font-bold text-slate-200 text-sm">{t('mobileWhatsAppNumber', currentLanguage)}</label>
             <input
               type="tel"
               value={phoneNumber}
@@ -294,14 +295,14 @@ export default function NotificationSettingsModal({
               placeholder="+91 98765 43210"
               className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none"
             />
-            <p className="text-[11px] text-slate-500">Must match E.164 format (e.g. +919876543210) for WhatsApp and SMS alert delivery.</p>
+            <p className="text-[11px] text-slate-500">{t('e164FormatHint', currentLanguage)}</p>
           </div>
 
           {/* Delivery Channels Grid with Test Buttons */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="font-bold text-slate-200 text-sm">Emergency Notification Channels</label>
-              <span className="text-[11px] text-slate-400">Test buttons send isolated test messages to your registered phone</span>
+              <label className="font-bold text-slate-200 text-sm">{t('emergencyChannels', currentLanguage)}</label>
+              <span className="text-[11px] text-slate-400">{t('testButtonsNotice', currentLanguage)}</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -316,12 +317,12 @@ export default function NotificationSettingsModal({
                       className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
                     />
                     <div>
-                      <div className="font-bold text-white text-sm">💬 WhatsApp</div>
+                      <div className="font-bold text-white text-sm">{t('channelWhatsApp', currentLanguage)}</div>
                       <div className="text-[11px] text-slate-400">Live Baileys / Twilio ({providerStatus['WHATSAPP'] || 'ACTIVE'})</div>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    Phase 1 Active
+                    {t('phase1Active', currentLanguage)}
                   </span>
                 </label>
 
@@ -337,7 +338,7 @@ export default function NotificationSettingsModal({
                       className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
                     >
                       <span>🧪</span>
-                      <span>{testState['WHATSAPP']?.loading ? 'Opening WhatsApp...' : 'Test WhatsApp'}</span>
+                      <span>{testState['WHATSAPP']?.loading ? t('openingWhatsApp', currentLanguage) : t('testWhatsApp', currentLanguage)}</span>
                     </button>
                     {testState['WHATSAPP']?.message && (
                       <p className={`text-[11px] font-mono text-center ${testState['WHATSAPP'].error ? 'text-rose-400' : 'text-emerald-400'}`}>
@@ -359,12 +360,12 @@ export default function NotificationSettingsModal({
                       className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
                     />
                     <div>
-                      <div className="font-bold text-white text-sm">🔔 Web Push</div>
+                      <div className="font-bold text-white text-sm">{t('channelWebPush', currentLanguage)}</div>
                       <div className="text-[11px] text-slate-400">Browser VAPID ({providerStatus['WEB_PUSH'] || 'ACTIVE'})</div>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    Phase 1 Active
+                    {t('phase1Active', currentLanguage)}
                   </span>
                 </label>
 
@@ -377,7 +378,7 @@ export default function NotificationSettingsModal({
                       className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
                     >
                       <span>🧪</span>
-                      <span>{testState['WEB_PUSH']?.loading ? 'Sending Test...' : 'Test Web Push'}</span>
+                      <span>{testState['WEB_PUSH']?.loading ? t('sendingTest', currentLanguage) : t('testWebPush', currentLanguage)}</span>
                     </button>
                     {testState['WEB_PUSH']?.message && (
                       <p className={`text-[11px] font-mono text-center ${testState['WEB_PUSH'].error ? 'text-rose-400' : 'text-emerald-400'}`}>
@@ -399,12 +400,12 @@ export default function NotificationSettingsModal({
                       className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
                     />
                     <div>
-                      <div className="font-bold text-white text-sm">📱 SMS Alerts</div>
+                      <div className="font-bold text-white text-sm">{t('channelSMS', currentLanguage)}</div>
                       <div className="text-[11px] text-slate-400">TextBee Android SIM Gateway ({providerStatus['SMS'] || 'ACTIVE'})</div>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    Phase 2 Active
+                    {t('phase2Active', currentLanguage)}
                   </span>
                 </label>
 
@@ -417,7 +418,7 @@ export default function NotificationSettingsModal({
                       className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
                     >
                       <span>🧪</span>
-                      <span>{testState['SMS']?.loading ? 'Sending Test...' : 'Test SMS'}</span>
+                      <span>{testState['SMS']?.loading ? t('sendingTest', currentLanguage) : t('testSMS', currentLanguage)}</span>
                     </button>
                     {testState['SMS']?.message && (
                       <p className={`text-[11px] font-mono text-center ${testState['SMS'].error ? 'text-rose-400' : 'text-emerald-400'}`}>
@@ -434,12 +435,12 @@ export default function NotificationSettingsModal({
                   <div className="flex items-center space-x-2.5">
                     <input type="checkbox" disabled checked={false} className="rounded bg-slate-900 border-slate-800 cursor-not-allowed" />
                     <div>
-                      <div className="font-bold text-slate-400 text-sm">📞 Voice / IVR Call</div>
-                      <div className="text-[10px] text-slate-500">Critical Warnings Call</div>
+                      <div className="font-bold text-slate-400 text-sm">{t('channelVoice', currentLanguage)}</div>
+                      <div className="text-[10px] text-slate-500">{t('criticalWarningsCall', currentLanguage)}</div>
                     </div>
                   </div>
                   <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-900 text-slate-500 border border-slate-800">
-                    Phase 3 (Disabled)
+                    {t('phase3Disabled', currentLanguage)}
                   </span>
                 </div>
               </div>
@@ -448,22 +449,22 @@ export default function NotificationSettingsModal({
 
           {/* Minimum Severity Threshold */}
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-200 text-sm">Minimum Severity Filter</label>
+            <label className="font-bold text-slate-200 text-sm">{t('minSeverityFilter', currentLanguage)}</label>
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value as any)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none cursor-pointer"
             >
-              <option value="Severe">Severe & Extreme Alerts (Recommended)</option>
-              <option value="Extreme">Extreme Emergency Only (Cyclones, Flash Floods)</option>
+              <option value="Severe">{t('severeAndExtreme', currentLanguage)}</option>
+              <option value="Extreme">{t('extremeOnly', currentLanguage)}</option>
             </select>
           </div>
 
           {/* Target Region */}
           <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-1">
-            <div className="font-bold text-slate-300 text-xs">Geographic Coverage Scope:</div>
+            <div className="font-bold text-slate-300 text-xs">{t('geographicScope', currentLanguage)}</div>
             <div className="text-slate-400 font-mono text-[11px]">
-              {selectedLocation ? `${selectedLocation.name}, ${selectedLocation.admin1 || selectedLocation.country}` : 'India (National Coverage)'}
+              {selectedLocation ? `${selectedLocation.name}, ${selectedLocation.admin1 || selectedLocation.country}` : t('nationalCoverage', currentLanguage)}
             </div>
           </div>
         </div>
@@ -477,7 +478,7 @@ export default function NotificationSettingsModal({
               disabled={isSaving}
               className="px-4 py-2.5 rounded-xl bg-rose-950 hover:bg-rose-900 text-rose-300 font-bold text-xs border border-rose-800 transition-colors"
             >
-              Unsubscribe All
+              {t('unsubscribeAll', currentLanguage)}
             </button>
           ) : <div />}
 
@@ -487,7 +488,7 @@ export default function NotificationSettingsModal({
               onClick={onClose}
               className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
             >
-              Cancel
+              {t('cancel', currentLanguage)}
             </button>
             <button
               type="button"
@@ -495,13 +496,13 @@ export default function NotificationSettingsModal({
               disabled={isSaving}
               className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-lg shadow-sky-600/20"
             >
-              {isSaving ? 'Saving...' : 'Save & Opt-In'}
+              {isSaving ? t('saving', currentLanguage) : t('saveAndOptIn', currentLanguage)}
             </button>
           </div>
         </div>
 
         <p className="text-[10px] text-slate-500 leading-relaxed font-mono">
-          * Explicit consent notice: Emergency disaster alerts are powered by authoritative SACHET/NDMA and GDACS feeds. Preferences are persisted in Supabase. Phase 2 active channels: WhatsApp, Web Push, and SMS.
+          {t('consentNotice', currentLanguage)}
         </p>
       </div>
     </div>

@@ -62,7 +62,7 @@ class GeminiModelRouter:
         return [
             GeminiModelConfig(
                 name=settings.GEMINI_MODEL_1,
-                display_name="Gemini 3.5 Flash Lite",
+                display_name="Gemini 2.5 Flash",
                 priority=1,
                 safe_rpm=settings.GEMINI_FLASH_LITE_SAFE_RPM,
                 safe_rpd=settings.GEMINI_FLASH_LITE_SAFE_RPD,
@@ -178,7 +178,7 @@ class GeminiModelRouter:
                 if model.priority == 1:
                     reason = "primary_available"
                 elif model.priority == 2:
-                    reason = "primary_rpm_threshold" if "gemini-3.5-flash-lite:rpm_limit" in ",".join(skipped_reasons) else "primary_unavailable"
+                    reason = "primary_rpm_threshold" if f"{settings.GEMINI_MODEL_1}:rpm_limit" in ",".join(skipped_reasons) else "primary_unavailable"
                 elif model.priority == 3:
                     reason = "primary_secondary_unavailable"
                 else:

@@ -75,7 +75,7 @@ export default function PersonalizedInsights({ weather, location, currentLanguag
           </div>
         </div>
         <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-950 text-sky-400 border border-sky-900/60">
-          AI Advisory
+          {t('aiAdvisory', currentLanguage)}
         </span>
       </div>
 
@@ -93,7 +93,7 @@ export default function PersonalizedInsights({ weather, location, currentLanguag
           </div>
           <p className="text-[11px] text-slate-400 leading-relaxed">
             {needsUmbrella
-              ? `${t('umbrellaReason', currentLanguage)} (Rain chance: ${rainProb}%)`
+              ? `${t('umbrellaReason', currentLanguage)} (${t('rainChance', currentLanguage)}: ${rainProb}%)`
               : t('noUmbrellaReason', currentLanguage)}
           </p>
         </div>
@@ -149,7 +149,7 @@ export default function PersonalizedInsights({ weather, location, currentLanguag
       </div>
 
       <div className="text-[10px] text-slate-500 font-mono pt-1">
-        * Contextual insights are informational suggestions based on Open-Meteo numerical predictions. Official SACHET/NDMA emergency warnings take legal precedence.
+        {t('contextualInsightsDisclaimer', currentLanguage)}
       </div>
     </div>
   );

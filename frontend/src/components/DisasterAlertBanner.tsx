@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { DisasterAlert, LocationResult, AlertSeverity } from '../types';
+import { t } from '../lib/translations';
 
 interface DisasterAlertBannerProps {
   alerts: DisasterAlert[] | null;
@@ -9,6 +10,7 @@ interface DisasterAlertBannerProps {
   error: string | null;
   location: LocationResult | null;
   onRetry?: () => void;
+  currentLanguage?: string;
 }
 
 export default function DisasterAlertBanner({
@@ -17,6 +19,7 @@ export default function DisasterAlertBanner({
   error,
   location,
   onRetry,
+  currentLanguage = 'en',
 }: DisasterAlertBannerProps) {
   const [expandedAlertId, setExpandedAlertId] = useState<string | null>(null);
 
@@ -35,8 +38,8 @@ export default function DisasterAlertBanner({
         <div className="flex items-center space-x-3">
           <span className="text-xl">⚠️</span>
           <div>
-            <div className="font-bold text-amber-300">Official Disaster Feed Notice</div>
-            <div>Unable to refresh real-time SACHET / NDMA alert feed. ({error})</div>
+            <div className="font-bold text-amber-300">{t('disasterFeedNotice', currentLanguage)}</div>
+            <div>{t('disasterFeedError', currentLanguage)} ({error})</div>
           </div>
         </div>
         {onRetry && (
@@ -45,7 +48,7 @@ export default function DisasterAlertBanner({
             onClick={onRetry}
             className="px-3 py-1.5 rounded-lg bg-amber-900/80 hover:bg-amber-800 text-amber-100 font-medium transition-colors"
           >
-            Retry
+            {t('retry', currentLanguage)}
           </button>
         )}
       </div>
@@ -81,21 +84,21 @@ export default function DisasterAlertBanner({
           <div>
             <div className="flex items-center space-x-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Official Disaster & Emergency Watch
+                {t('disasterWatchTitle', currentLanguage)}
               </h3>
               <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-950 text-slate-300 border border-slate-800">
-                SACHET / NDMA Feeds
+                {t('sachetNdmaFeeds', currentLanguage)}
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              National Disaster Management Authority authoritative CAP emergency bulletins
+              {t('sachetNdmaSubtitle', currentLanguage)}
             </p>
           </div>
         </div>
 
         {hasActiveAlerts && (
           <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-950 text-rose-300 border border-rose-800 animate-pulse">
-            {activeAlerts.length} Active {activeAlerts.length === 1 ? 'Warning' : 'Warnings'}
+            {activeAlerts.length} {activeAlerts.length === 1 ? t('activeWarning', currentLanguage) : t('activeWarnings', currentLanguage)}
           </span>
         )}
       </div>
@@ -114,13 +117,13 @@ export default function DisasterAlertBanner({
                   <div className="space-y-0.5">
                     <div className="flex items-center space-x-2">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getSeverityBadge(alert.severity)}`}>
-                        {alert.severity} Severity
+                        {alert.severity} {t('severityLabel', currentLanguage)}
                       </span>
                       <span className="text-xs font-bold text-white">
                         {alert.event_type}
                       </span>
                       <span className="text-[10px] font-mono text-slate-500">
-                        [{alert.scope} Level]
+                        [{alert.scope} {t('levelLabel', currentLanguage)}]
                       </span>
                     </div>
                     <h4 className="text-sm font-bold text-rose-200 mt-1">
@@ -133,7 +136,7 @@ export default function DisasterAlertBanner({
                     onClick={() => setExpandedAlertId(isExpanded ? null : alert.alert_id)}
                     className="text-xs font-medium text-sky-400 hover:text-sky-300 transition-colors"
                   >
-                    {isExpanded ? '▲ Hide Details' : '▼ View Safety Instructions'}
+                    {isExpanded ? t('hideDetails', currentLanguage) : t('viewInstructions', currentLanguage)}
                   </button>
                 </div>
 
@@ -146,26 +149,26 @@ export default function DisasterAlertBanner({
                   <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2 text-xs">
                     {alert.instruction && (
                       <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-amber-200">
-                        <strong className="text-amber-400">Official Safety Instruction:</strong>
+                        <strong className="text-amber-400">{t('safetyInstructionLabel', currentLanguage)}</strong>
                         <p className="mt-1 leading-relaxed">{alert.instruction}</p>
                       </div>
                     )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400 font-mono bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
                       <div>
-                        <span className="text-slate-500">Affected Area:</span> {alert.affected_area}
+                        <span className="text-slate-500">{t('affectedArea', currentLanguage)}</span> {alert.affected_area}
                       </div>
                       <div>
-                        <span className="text-slate-500">Urgency:</span> {alert.urgency} ({alert.certainty})
+                        <span className="text-slate-500">{t('urgency', currentLanguage)}</span> {alert.urgency} ({alert.certainty})
                       </div>
                       {alert.effective_time && (
                         <div>
-                          <span className="text-slate-500">Effective:</span> {new Date(alert.effective_time).toLocaleString()}
+                          <span className="text-slate-500">{t('effective', currentLanguage)}</span> {new Date(alert.effective_time).toLocaleString()}
                         </div>
                       )}
                       {alert.expires_time && (
                         <div>
-                          <span className="text-slate-500">Expires:</span> {new Date(alert.expires_time).toLocaleString()}
+                          <span className="text-slate-500">{t('expires', currentLanguage)}</span> {new Date(alert.expires_time).toLocaleString()}
                         </div>
                       )}
                     </div>
@@ -178,7 +181,7 @@ export default function DisasterAlertBanner({
                           rel="noopener noreferrer"
                           className="text-[11px] text-sky-400 hover:underline"
                         >
-                          View Official Bulletin Source →
+                          {t('viewOfficialBulletin', currentLanguage)}
                         </a>
                       </div>
                     )}
@@ -194,12 +197,12 @@ export default function DisasterAlertBanner({
           <div className="flex items-center space-x-2 text-slate-300">
             <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
             <span>
-              No active disaster warnings or severe weather advisories for{' '}
-              <strong className="text-white">{location?.name || 'this location'}</strong>.
+              {t('noActiveAlertsForLocation', currentLanguage)}{' '}
+              <strong className="text-white">{location?.name || ''}</strong>.
             </span>
           </div>
           <span className="text-[10px] text-slate-500 font-mono hidden sm:inline-block">
-            Feed Synced with SACHET / NDMA
+            {t('feedSyncedSachet', currentLanguage)}
           </span>
         </div>
       )}

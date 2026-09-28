@@ -30,9 +30,9 @@ export default function CurrentWeatherCard({ weather, isLoading, currentLanguage
     return (
       <div className="w-full bg-slate-900/80 border border-slate-800 rounded-3xl p-8 text-center space-y-3">
         <div className="text-4xl">🌤️</div>
-        <h3 className="text-lg font-semibold text-white">No Weather Data Selected</h3>
+        <h3 className="text-lg font-semibold text-white">{t('noWeatherDataSelected', currentLanguage)}</h3>
         <p className="text-xs text-slate-400 max-w-sm mx-auto">
-          Search for a city above or allow GPS to view real-time meteorological observations.
+          {t('noWeatherDataDesc', currentLanguage)}
         </p>
       </div>
     );
@@ -74,7 +74,7 @@ export default function CurrentWeatherCard({ weather, isLoading, currentLanguage
                 ? 'bg-amber-950/80 text-amber-400 border border-amber-800'
                 : 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
             }`}>
-              {cached ? 'CACHE HIT' : 'LIVE FEED'}
+              {cached ? t('cacheHit', currentLanguage) : t('liveFeed', currentLanguage)}
             </span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mt-1">
@@ -88,9 +88,9 @@ export default function CurrentWeatherCard({ weather, isLoading, currentLanguage
         </div>
 
         <div className="text-right text-[11px] font-mono text-slate-400">
-          <div>Timezone: {timezone}</div>
+          <div>{t('timezoneLabel', currentLanguage)}: {timezone}</div>
           <div className="text-[10px] text-slate-500">
-            Observed: {new Date(current.observed_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {t('observedLabel', currentLanguage)}: {new Date(current.observed_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
         </div>
       </div>
@@ -114,7 +114,7 @@ export default function CurrentWeatherCard({ weather, isLoading, currentLanguage
               <span className="text-slate-200 font-medium">
                 {current.apparent_temperature_c !== null && current.apparent_temperature_c !== undefined
                   ? `${current.apparent_temperature_c.toFixed(1)}°C`
-                  : 'Unavailable'}
+                  : t('unavailable', currentLanguage)}
               </span>
             </div>
           </div>

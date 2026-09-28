@@ -3,12 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import { DisasterAlert, AlertSeverity } from '../types';
 import { fetchGdacsTop7 } from '../lib/api';
+import { t } from '../lib/translations';
 
 interface GdacsAlertsPanelProps {
   onAlertsLoaded?: (alerts: DisasterAlert[]) => void;
+  currentLanguage?: string;
 }
 
-export default function GdacsAlertsPanel({ onAlertsLoaded }: GdacsAlertsPanelProps) {
+export default function GdacsAlertsPanel({ onAlertsLoaded, currentLanguage = 'en' }: GdacsAlertsPanelProps) {
   const [alerts, setAlerts] = useState<DisasterAlert[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,13 +77,13 @@ export default function GdacsAlertsPanel({ onAlertsLoaded }: GdacsAlertsPanelPro
   if (error) {
     return (
       <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 text-xs text-slate-400 flex items-center justify-between">
-        <span>🌐 Live GDACS feed temporarily unavailable ({error})</span>
+        <span>🌐 {t('disasterFeedError', currentLanguage)} ({error})</span>
         <button
           type="button"
           onClick={loadGdacs}
           className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
         >
-          Retry
+          {t('retry', currentLanguage)}
         </button>
       </div>
     );
@@ -98,20 +100,20 @@ export default function GdacsAlertsPanel({ onAlertsLoaded }: GdacsAlertsPanelPro
           <div>
             <div className="flex items-center space-x-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Top 7 Live Global Disaster Watch
+                {t('gdacsTitle', currentLanguage)}
               </h3>
               <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-950 text-slate-300 border border-slate-800">
-                GDACS Live Feed
+                {t('gdacsFeed', currentLanguage)}
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Global Disaster Alert and Coordination System (UN / EC Framework)
+              {t('gdacsSubtitle', currentLanguage)}
             </p>
           </div>
         </div>
 
         <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-sky-950 text-sky-300 border border-sky-800">
-          {alerts.length} {alerts.length === 1 ? 'Event' : 'Events'} Ranked
+          {alerts.length} {alerts.length === 1 ? t('eventRanked', currentLanguage) : t('eventsRanked', currentLanguage)}
         </span>
       </div>
 
@@ -145,10 +147,10 @@ export default function GdacsAlertsPanel({ onAlertsLoaded }: GdacsAlertsPanelPro
 
                   <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono">
                     {alert.issued_time && (
-                      <span>Issued: {new Date(alert.issued_time).toLocaleDateString()}</span>
+                      <span>{t('issuedLabel', currentLanguage)} {new Date(alert.issued_time).toLocaleDateString()}</span>
                     )}
                     {alert.polygon_coordinates && alert.polygon_coordinates.length > 0 && (
-                      <span>Coords: {alert.polygon_coordinates[0][0].toFixed(2)}°, {alert.polygon_coordinates[0][1].toFixed(2)}°</span>
+                      <span>{t('coordsLabel', currentLanguage)} {alert.polygon_coordinates[0][0].toFixed(2)}°, {alert.polygon_coordinates[0][1].toFixed(2)}°</span>
                     )}
                   </div>
                 </div>
@@ -161,7 +163,7 @@ export default function GdacsAlertsPanel({ onAlertsLoaded }: GdacsAlertsPanelPro
                   rel="noopener noreferrer"
                   className="text-[11px] font-medium text-sky-400 hover:text-sky-300 transition-colors whitespace-nowrap"
                 >
-                  View Bulletin →
+                  {t('viewBulletin', currentLanguage)}
                 </a>
               )}
             </div>
@@ -169,13 +171,13 @@ export default function GdacsAlertsPanel({ onAlertsLoaded }: GdacsAlertsPanelPro
         </div>
       ) : (
         <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 font-mono text-center">
-          No active high-severity GDACS events currently logged in live feed.
+          {t('noGdacsAlerts', currentLanguage)}
         </div>
       )}
 
       {/* Attribution Footer */}
       <div className="pt-1 text-[10px] text-slate-500 font-mono text-right border-t border-slate-800/60">
-        Source: GDACS (UN-OCHA & European Commission)
+        {t('gdacsSource', currentLanguage)}
       </div>
     </div>
   );

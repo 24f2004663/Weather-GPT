@@ -22,6 +22,7 @@ import {
   DisasterAlert,
 } from '../types';
 import { getWeatherForecast, getHistoricalClimate, fetchDisasterAlerts, API_BASE_URL } from '../lib/api';
+import { t } from '../lib/translations';
 
 // Default initial location: Chennai, Tamil Nadu, India
 const DEFAULT_LOCATION: LocationResult = {
@@ -146,7 +147,7 @@ export default function HomePage() {
               onClick={() => loadDataForLocation(selectedLocation)}
               className="px-3 py-1 bg-rose-900 hover:bg-rose-800 text-white rounded-lg font-medium transition-colors"
             >
-              Retry
+              {t('retry', currentLanguage)}
             </button>
           </div>
         )}
@@ -176,10 +177,14 @@ export default function HomePage() {
               error={alertsError}
               location={selectedLocation}
               onRetry={() => loadDataForLocation(selectedLocation)}
+              currentLanguage={currentLanguage}
             />
 
             {/* 4. Top 7 Live GDACS Disaster Alerts */}
-            <GdacsAlertsPanel onAlertsLoaded={setGdacsAlerts} />
+            <GdacsAlertsPanel
+              onAlertsLoaded={setGdacsAlerts}
+              currentLanguage={currentLanguage}
+            />
 
             {/* 5. Interactive Geospatial Weather & Alert Map */}
             <WeatherMap
@@ -187,30 +192,39 @@ export default function HomePage() {
               weather={weatherData}
               alerts={alerts}
               gdacsAlerts={gdacsAlerts}
+              currentLanguage={currentLanguage}
             />
 
-            {/* 5. 24-Hour Hourly Scrollable Strip */}
+            {/* 6. 24-Hour Hourly Scrollable Strip */}
             {weatherData && weatherData.hourly && (
-              <HourlyForecastStrip hourly={weatherData.hourly} />
+              <HourlyForecastStrip
+                hourly={weatherData.hourly}
+                currentLanguage={currentLanguage}
+              />
             )}
 
-            {/* 6. Meteorological Trend Charts (SVG) */}
+            {/* 7. Meteorological Trend Charts (SVG) */}
             {weatherData && (
               <WeatherCharts
                 hourly={weatherData.hourly || []}
                 daily={weatherData.daily || []}
+                currentLanguage={currentLanguage}
               />
             )}
 
-            {/* 7. 7-Day Synoptic Forecast Grid */}
+            {/* 8. 7-Day Synoptic Forecast Grid */}
             {weatherData && weatherData.daily && (
-              <DailyForecastGrid daily={weatherData.daily} />
+              <DailyForecastGrid
+                daily={weatherData.daily}
+                currentLanguage={currentLanguage}
+              />
             )}
 
-            {/* 8. 30-Year NASA POWER Climatological Baseline */}
+            {/* 9. 30-Year NASA POWER Climatological Baseline */}
             <ClimateSection
               climate={climateData}
               isLoading={isLoadingClimate}
+              currentLanguage={currentLanguage}
             />
           </section>
 
@@ -226,7 +240,7 @@ export default function HomePage() {
         </div>
 
         {/* Footer Data Source Attribution */}
-        <SourceAttributionPanel />
+        <SourceAttributionPanel currentLanguage={currentLanguage} />
       </main>
     </div>
   );

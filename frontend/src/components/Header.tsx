@@ -115,10 +115,10 @@ export default function Header({
                 WeatherGPT
               </h1>
               <span className="px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase rounded-full bg-sky-950 text-sky-400 border border-sky-800">
-                AI Platform
+                {t('aiPlatform', currentLanguage)}
               </span>
             </div>
-            <p className="text-xs text-slate-400">Weather Intelligence & Disaster Awareness</p>
+            <p className="text-xs text-slate-400">{t('weatherTagline', currentLanguage)}</p>
           </div>
         </div>
 
@@ -132,7 +132,7 @@ export default function Header({
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('searchPlaceholder', currentLanguage)}
               className="w-full bg-slate-950/90 border border-slate-800 focus:border-sky-500 rounded-xl pl-10 pr-24 py-2 text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
-              aria-label="Search city or location"
+              aria-label={t('searchAriaLabel', currentLanguage)}
             />
             {isSearching && (
               <span className="absolute right-12 text-xs text-sky-400 animate-pulse font-mono">
@@ -142,10 +142,10 @@ export default function Header({
             <button
               type="button"
               onClick={handleUseCurrentLocation}
-              title="Use current location"
+              title={t('useCurrentLocation', currentLanguage)}
               className="absolute right-2 px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors flex items-center gap-1"
             >
-              <span>📍 GPS</span>
+              <span>{t('gpsButton', currentLanguage)}</span>
             </button>
           </div>
 
@@ -191,7 +191,7 @@ export default function Header({
               type="button"
               onClick={onOpenNotificationSettings}
               className="px-3 py-1.5 rounded-xl bg-amber-950/70 hover:bg-amber-900 border border-amber-800 text-amber-200 text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
-              title="Configure multi-channel disaster alert notifications"
+              title={t('alertSettingsTooltip', currentLanguage)}
             >
               <span>🔔</span>
               <span className="hidden sm:inline">{t('alertSettings', currentLanguage)}</span>
@@ -204,7 +204,7 @@ export default function Header({
               value={currentLanguage}
               onChange={(e) => onLanguageChange(e.target.value)}
               className="bg-slate-800/90 text-slate-200 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-sky-500 cursor-pointer"
-              aria-label="Select language"
+              aria-label={t('selectLanguage', currentLanguage)}
             >
               {LANGUAGES.map((lang) => (
                 <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
