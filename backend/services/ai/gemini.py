@@ -154,9 +154,10 @@ class GeminiAIService(BaseAIService):
                     logger.error(f"[Gemini API Network Error] Model {clean_model}: {str(e)}")
                     raise UpstreamProviderError(provider=f"Gemini API ({clean_model})", status_code=None, message=str(e))
 
-                if response.status_code in (404, 429, 502, 503, 504):
+                if response.status_code in (400, 404, 429) or response.status_code >= 500:
+                    err_snippet = response.text[:200] if response.text else ""
                     logger.warning(
-                        f"[Gemini API] event={response.status_code} model={clean_model} action=temporary_suppress tool_iteration={iteration}"
+                        f"[Gemini API] event={response.status_code} model={clean_model} error={err_snippet} action=temporary_suppress tool_iteration={iteration}"
                     )
                     await gemini_model_router.record_429(selected_model_config.name)
                     excluded_models_for_request.add(selected_model_config.name)
@@ -168,7 +169,7 @@ class GeminiAIService(BaseAIService):
                 )
                 break  # Successful non-error response received
 
-            if response is None or response.status_code in (404, 429, 502, 503, 504):
+            if response is None or response.status_code in (400, 404, 429) or response.status_code >= 500:
                 final_status = response.status_code if response else 503
                 raise UpstreamProviderError(
                     provider="Gemini API",

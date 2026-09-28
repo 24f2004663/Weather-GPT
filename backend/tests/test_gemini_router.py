@@ -420,5 +420,34 @@ class TestGeminiMultiModelRouter(unittest.TestCase):
         self.assertTrue(status["gemma-4-26b-a4b-it"]["is_429_suppressed"])
         self.assertEqual(status["gemini-3.1-flash-lite"]["current_rpm"], 1)
 
+    # -----------------------------------------------------------------------
+    # Test 18: HTTP 500 internal server error triggers fallback cascade
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_500_internal_error_triggers_fallback_cascade(self, mock_get_client):
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Primary model (gemma-4-31b-it) returns 500 Internal Server Error
+        resp_500 = MagicMock(status_code=500, text='{"error": {"code": 500, "message": "Internal error encountered."}}')
+        # Secondary model (gemma-4-26b-a4b-it) returns 200 OK
+        resp_200 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "Answered via secondary model after 500."}], "role": "model"}}]
+        })
+
+        mock_client.post.side_effect = [resp_500, resp_200]
+
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="500 fallback test")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        self.assertIn("secondary model after 500", res.response_message.content)
+        status = asyncio.run(gemini_model_router.get_status())
+        # Model 1 was attempted once and is now suppressed
+        self.assertEqual(status["gemma-4-31b-it"]["current_rpm"], 1)
+        self.assertTrue(status["gemma-4-31b-it"]["is_429_suppressed"])
+        # Model 2 took over and succeeded
+        self.assertEqual(status["gemma-4-26b-a4b-it"]["current_rpm"], 1)
+
 if __name__ == "__main__":
     unittest.main()
