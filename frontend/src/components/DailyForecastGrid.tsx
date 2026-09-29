@@ -3,6 +3,8 @@
 import React from 'react';
 import { DailyForecast } from '../types';
 import { t } from '../lib/translations';
+import WeatherIcon from './WeatherIcon';
+import { CloudRain } from 'lucide-react';
 
 interface DailyForecastGridProps {
   daily: DailyForecast[];
@@ -23,30 +25,14 @@ export default function DailyForecastGrid({ daily, currentLanguage = 'en' }: Dai
     }
   };
 
-  const getConditionEmoji = (iconKey: string) => {
-    switch (iconKey) {
-      case 'clear-day': return '☀️';
-      case 'mainly-clear': return '🌤️';
-      case 'partly-cloudy': return '⛅';
-      case 'overcast': return '☁️';
-      case 'fog': return '🌫️';
-      case 'drizzle': return '🌦️';
-      case 'rain-light':
-      case 'rain-moderate': return '🌧️';
-      case 'rain-heavy': return '⛈️';
-      case 'thunderstorm': return '⚡';
-      default: return '🌤️';
-    }
-  };
-
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+    <div className="w-full glass rounded-3xl p-6 md:p-8 shadow-lg space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-white/90">
             {t('forecast7d', currentLanguage)}
           </h3>
-          <p className="text-xs text-slate-400">{t('multiDayProjections', currentLanguage)}</p>
+          <p className="text-xs text-white/70">{t('multiDayProjections', currentLanguage)}</p>
         </div>
       </div>
 
@@ -54,29 +40,29 @@ export default function DailyForecastGrid({ daily, currentLanguage = 'en' }: Dai
         {daily.slice(0, 7).map((day, idx) => (
           <div
             key={idx}
-            className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between items-center text-center hover:border-slate-700 transition-colors space-y-2"
+            className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col justify-between items-center text-center hover:bg-white/10 transition-colors space-y-2 backdrop-blur-md"
           >
-            <div className="text-xs font-semibold text-slate-300">
+            <div className="text-xs font-semibold text-white/80">
               {formatWeekday(day.date)}
             </div>
 
-            <div className="text-3xl my-1 select-none" title={day.weather_condition}>
-              {getConditionEmoji(day.icon_key)}
+            <div className="my-1 text-ink/85" title={day.weather_condition}>
+              <WeatherIcon iconKey={day.icon_key} size={30} />
             </div>
 
-            <div className="text-xs font-medium text-slate-300 line-clamp-1">
+            <div className="text-xs font-medium text-white/80 line-clamp-1">
               {day.weather_condition}
             </div>
 
             <div className="flex items-center space-x-1.5 text-xs">
               <span className="font-bold text-white">{day.temperature_max_c.toFixed(0)}°</span>
-              <span className="text-slate-500">/</span>
-              <span className="text-slate-400">{day.temperature_min_c.toFixed(0)}°</span>
+              <span className="text-white/50">/</span>
+              <span className="text-white/70">{day.temperature_min_c.toFixed(0)}°</span>
             </div>
 
             {day.precipitation_probability_max !== null && day.precipitation_probability_max !== undefined && (
-              <div className="w-full text-[10px] font-semibold text-sky-400 bg-sky-950/60 border border-sky-900/60 rounded-lg py-0.5">
-                🌧️ {day.precipitation_probability_max}%
+              <div className="w-full text-[10px] font-semibold text-sky-200 bg-sky-900/40 border border-sky-400/20 rounded-lg py-0.5">
+                <CloudRain size={11} strokeWidth={2} aria-hidden="true" className="inline-block mr-1 -mt-0.5" />{day.precipitation_probability_max}%
               </div>
             )}
           </div>

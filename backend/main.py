@@ -22,7 +22,7 @@ from backend.core.errors import (
 )
 from backend.schemas.health import HealthResponse
 from backend.schemas.config import ConfigStatusResponse
-from backend.schemas.location import LocationSearchResponse
+from backend.schemas.location import LocationSearchResponse, LocationResult
 from backend.schemas.weather import NormalizedWeatherResponse
 from backend.schemas.climate import NasaPowerClimateResponse
 from backend.schemas.alerts import AlertListResponse, AlertSeverity, DisasterAlert, AlertUrgency, AlertCertainty, AlertStatus, GeographicScope
@@ -37,7 +37,8 @@ from backend.schemas.notifications import (
     NotificationChannel,
     TestNotificationRequest,
 )
-from backend.services.weather.open_meteo import open_meteo_provider
+from backend.services.weather.open_meteo import open_meteo_provider, NWP_MODELS, normalize_model
+from backend.services.weather.reverse_geocode import reverse_geocode_provider
 from backend.services.weather.nasa_power import nasa_power_provider
 from backend.services.alerts.sachet import sachet_alert_provider
 from backend.services.alerts.gdacs import gdacs_alert_provider
@@ -263,14 +264,35 @@ async def search_location(
         results=results,
     )
 
+@app.get("/api/location/reverse", response_model=Optional[LocationResult], tags=["Location"])
+async def reverse_geocode_location(
+    response: FastAPIResponse,
+    lat: float = Query(..., ge=-90.0, le=90.0, description="Latitude in decimal degrees"),
+    lon: float = Query(..., ge=-180.0, le=180.0, description="Longitude in decimal degrees"),
+):
+    """
+    Resolves device coordinates to a place name, so a GPS-located user sees their actual
+    town rather than a placeholder — and, because the result carries admin1/admin2, gets
+    their state and district matched against disaster alerts.
+
+    Returns null when the point cannot be named (open water, unmapped terrain); the caller
+    keeps whatever fallback it already had rather than being handed an invented name.
+    """
+    response.headers["Cache-Control"] = "public, max-age=604800"
+    return await reverse_geocode_provider.reverse(lat=lat, lon=lon)
+
 @app.get("/api/weather/current", response_model=NormalizedWeatherResponse, tags=["Weather"])
 async def get_current_weather(
     response: FastAPIResponse,
     lat: float = Query(..., ge=-90.0, le=90.0, description="Latitude in decimal degrees"),
     lon: float = Query(..., ge=-180.0, le=180.0, description="Longitude in decimal degrees"),
+    model: Optional[str] = Query(
+        default=None,
+        description="NWP model id (e.g. gfs_seamless, icon_seamless, ecmwf_ifs025). Unrecognized values fall back to the multi-model blend. See /api/weather/models."
+    ),
 ):
     response.headers["Cache-Control"] = "public, max-age=900, stale-while-revalidate=7200"
-    return await open_meteo_provider.get_current_weather(lat=lat, lon=lon)
+    return await open_meteo_provider.get_current_weather(lat=lat, lon=lon, model=model)
 
 @app.get("/api/weather/forecast", response_model=NormalizedWeatherResponse, tags=["Weather"])
 async def get_weather_forecast(
@@ -278,17 +300,27 @@ async def get_weather_forecast(
     lat: float = Query(..., ge=-90.0, le=90.0, description="Latitude in decimal degrees"),
     lon: float = Query(..., ge=-180.0, le=180.0, description="Longitude in decimal degrees"),
     days: int = Query(default=7, ge=1, le=16, description="Forecast days (1-16)"),
-    hourly: bool = Query(default=True, description="Include hourly forecast data")
+    hourly: bool = Query(default=True, description="Include hourly forecast data"),
+    model: Optional[str] = Query(
+        default=None,
+        description="NWP model id (e.g. gfs_seamless, icon_seamless, ecmwf_ifs025). Unrecognized values fall back to the multi-model blend. See /api/weather/models."
+    ),
 ):
     response.headers["Cache-Control"] = "public, max-age=900, stale-while-revalidate=7200"
-    return await open_meteo_provider.get_forecast(lat=lat, lon=lon, days=days, include_hourly=hourly)
+    return await open_meteo_provider.get_forecast(
+        lat=lat, lon=lon, days=days, include_hourly=hourly, model=model
+    )
 
 @app.get("/api/weather/by-city", response_model=NormalizedWeatherResponse, tags=["Weather"])
 async def get_weather_by_city(
     response: FastAPIResponse,
     city: str = Query(..., min_length=1, max_length=100, description="City name to lookup and fetch weather for"),
     days: int = Query(default=7, ge=1, le=16, description="Forecast days (1-16)"),
-    hourly: bool = Query(default=True, description="Include hourly forecast data")
+    hourly: bool = Query(default=True, description="Include hourly forecast data"),
+    model: Optional[str] = Query(
+        default=None,
+        description="NWP model id (e.g. gfs_seamless, icon_seamless, ecmwf_ifs025). Unrecognized values fall back to the multi-model blend. See /api/weather/models."
+    ),
 ):
     response.headers["Cache-Control"] = "public, max-age=900, stale-while-revalidate=7200"
     locations = await open_meteo_provider.resolve_location(query=city, count=1)
@@ -301,8 +333,20 @@ async def get_weather_by_city(
         lon=target_loc.longitude,
         days=days,
         include_hourly=hourly,
-        location_meta=target_loc
+        location_meta=target_loc,
+        model=model
     )
+
+@app.get("/api/weather/models", tags=["Weather"])
+async def list_nwp_models(response: FastAPIResponse):
+    """Lists the Numerical Weather Prediction models a forecast can be pinned to."""
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return {
+        "default": normalize_model(None),
+        "models": [
+            {"id": model_id, **meta} for model_id, meta in NWP_MODELS.items()
+        ],
+    }
 
 @app.get("/api/climate/historical", response_model=NasaPowerClimateResponse, tags=["Climate"])
 async def get_historical_climate(

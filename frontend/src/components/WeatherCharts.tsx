@@ -44,24 +44,24 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
   const svgAreaPath = `${svgPath} L ${getX(next24.length - 1)},${height} L ${getX(0)},${height} Z`;
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+    <div className="w-full glass rounded-3xl p-6 md:p-8 shadow-lg space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-white/90">
             {t('meteorologicalTrends', currentLanguage)}
           </h3>
-          <p className="text-xs text-slate-400">{t('trendsSubtitle', currentLanguage)}</p>
+          <p className="text-xs text-white/70">{t('trendsSubtitle', currentLanguage)}</p>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs">
+        <div className="flex bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10 text-xs">
           <button
             type="button"
             onClick={() => setActiveTab('temp')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
               activeTab === 'temp'
-                ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-sky-600 text-[#fff] shadow-md'
+                : 'text-white/60 hover:text-white'
             }`}
           >
             {t('hourlyTemp', currentLanguage)}
@@ -71,8 +71,8 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
             onClick={() => setActiveTab('precip')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
               activeTab === 'precip'
-                ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-sky-600 text-[#fff] shadow-md'
+                : 'text-white/60 hover:text-white'
             }`}
           >
             {t('rainProbability', currentLanguage)}
@@ -82,8 +82,8 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
             onClick={() => setActiveTab('7day')}
             className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
               activeTab === '7day'
-                ? 'bg-sky-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-sky-600 text-[#fff] shadow-md'
+                : 'text-white/60 hover:text-white'
             }`}
           >
             {t('sevenDayMinMax', currentLanguage)}
@@ -107,8 +107,8 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
               <path d={svgAreaPath} fill="url(#tempGradient)" />
 
               {/* Grid Lines */}
-              <line x1={paddingX} y1={getY(maxTemp)} x2={width - paddingX} y2={getY(maxTemp)} stroke="#334155" strokeDasharray="3 3" />
-              <line x1={paddingX} y1={getY(minTemp)} x2={width - paddingX} y2={getY(minTemp)} stroke="#334155" strokeDasharray="3 3" />
+              <line x1={paddingX} y1={getY(maxTemp)} x2={width - paddingX} y2={getY(maxTemp)} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
+              <line x1={paddingX} y1={getY(minTemp)} x2={width - paddingX} y2={getY(minTemp)} stroke="rgba(255,255,255,0.2)" strokeDasharray="3 3" />
 
               {/* Main Line */}
               <path d={svgPath} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" />
@@ -122,11 +122,11 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
 
                 return (
                   <g key={i}>
-                    <circle cx={x} cy={y} r="4" fill="#38bdf8" stroke="#0f172a" strokeWidth="2" />
+                    <circle cx={x} cy={y} r="4" fill="#38bdf8" stroke="rgba(255,255,255,0.8)" strokeWidth="2" />
                     <text x={x} y={y - 8} textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="bold" fontFamily="sans-serif">
                       {h.temperature_c.toFixed(0)}°
                     </text>
-                    <text x={x} y={height - 5} textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="sans-serif">
+                    <text x={x} y={height - 5} textAnchor="middle" fill="rgba(255,255,255,0.7)" fontSize="9" fontFamily="sans-serif">
                       {hourLabel}
                     </text>
                   </g>
@@ -140,7 +140,7 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
       {/* Tab 2: Hourly Precipitation Probability Bars */}
       {activeTab === 'precip' && (
         <div className="w-full overflow-x-auto">
-          <div className="min-w-[600px] h-44 flex items-end justify-between gap-1.5 px-4 pt-4 pb-2 bg-slate-950/60 rounded-2xl border border-slate-800">
+          <div className="min-w-[600px] h-44 flex items-end justify-between gap-1.5 px-4 pt-4 pb-2 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-md">
             {next24.map((h, i) => {
               const prob = h.precipitation_probability ?? 0;
               const barHeight = Math.max(prob, 4);
@@ -154,10 +154,10 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
                   <div
                     style={{ height: `${barHeight}%` }}
                     className={`w-full max-w-[18px] rounded-t-md transition-all ${
-                      prob > 50 ? 'bg-sky-500 shadow-md shadow-sky-500/30' : prob > 20 ? 'bg-sky-600/80' : 'bg-slate-800'
+                      prob > 50 ? 'bg-sky-500 shadow-md shadow-sky-500/30' : prob > 20 ? 'bg-sky-500/60' : 'bg-white/10'
                     }`}
                   ></div>
-                  <span className="text-[8px] font-mono text-slate-500 mt-1 truncate">
+                  <span className="text-[8px] font-mono text-white/50 mt-1 truncate">
                     {i % 4 === 0 ? hourLabel : ''}
                   </span>
                 </div>
@@ -180,13 +180,13 @@ export default function WeatherCharts({ hourly, daily, currentLanguage = 'en' }:
 
             return (
               <div key={i} className="flex items-center text-xs gap-3">
-                <span className="w-20 font-medium text-slate-300 truncate">
+                <span className="w-20 font-medium text-white/80 truncate">
                   {new Date(d.date).toLocaleDateString([], { weekday: 'short', month: 'numeric', day: 'numeric' })}
                 </span>
-                <span className="w-8 text-right text-slate-400 font-mono">
+                <span className="w-8 text-right text-white/70 font-mono">
                   {d.temperature_min_c.toFixed(0)}°
                 </span>
-                <div className="flex-1 bg-slate-950 h-3 rounded-full relative overflow-hidden">
+                <div className="flex-1 bg-white/10 h-3 rounded-full relative overflow-hidden backdrop-blur-sm">
                   <div
                     style={{ left: `${leftPercent}%`, width: `${barWidth}%` }}
                     className="absolute h-full bg-gradient-to-r from-sky-500 to-amber-500 rounded-full"

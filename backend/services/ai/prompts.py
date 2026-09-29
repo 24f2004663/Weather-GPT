@@ -1,3 +1,5 @@
+from typing import Optional
+
 SYSTEM_INSTRUCTION = """You are WeatherGPT, an AI Weather Intelligence and Disaster Awareness Platform Assistant.
 
 Your purpose is to provide clear, actionable, and accurate weather intelligence, hyper-local forecasts, and emergency safety guidance based strictly on verified meteorological data.
@@ -71,3 +73,77 @@ NEVER output internal planning statements or meta-commentary such as:
 - "Based on the tool output, I should..."
 These thoughts must remain internal. Output ONLY the polished, final user-facing response.
 """
+
+
+# ---------------------------------------------------------------------------
+# Output language control
+#
+# ChatRequest.language_preference carries the language the user selected in the UI.
+# Without an explicit directive the model simply guesses from the input, which made
+# output language vary by script: Tamil queries came back in Tamil, Bengali queries
+# came back mostly in English, and the selector itself did nothing at all.
+# ---------------------------------------------------------------------------
+
+# Languages the assistant is allowed to be steered into. Anything else falls back to
+# English. The value reaches the prompt, so it is whitelisted rather than
+# interpolated directly -- an unvalidated client string here is a prompt-injection sink.
+SUPPORTED_OUTPUT_LANGUAGES: dict = {
+    "en": "English",
+    "hi": "Hindi (हिन्दी)",
+    "ta": "Tamil (தமிழ்)",
+    "te": "Telugu (తెలుగు)",
+    "bn": "Bengali (বাংলা)",
+    "mr": "Marathi (मराठी)",
+    "gu": "Gujarati (ગુજરાતી)",
+    "kn": "Kannada (ಕನ್ನಡ)",
+    "ml": "Malayalam (മലയാളം)",
+    "pa": "Punjabi (ਪੰਜਾਬੀ)",
+    "or": "Odia (ଓଡ଼ିଆ)",
+    "as": "Assamese (অসমীয়া)",
+    "ur": "Urdu (اردو)",
+}
+
+DEFAULT_OUTPUT_LANGUAGE = "en"
+
+_LANGUAGE_DIRECTIVE_TEMPLATE = """
+
+Output Language Requirement:
+The user has selected {language} as their interface language. Write your ENTIRE response in {language}.
+- Section headings, bullet labels, condition names and safety advice must all be in {language}. Do not leave them in English.
+- Keep numeric values, units (°C, km/h, mm, %) and times in standard numeric form.
+- On first mention of a place name, give the {language} form followed by the English name in parentheses.
+- Do NOT translate official SACHET/NDMA emergency instructions. Reproduce official warning text exactly as issued by the agency; where an official version in {language} was supplied by the tools, use that official version verbatim rather than translating the English one.
+- This language requirement applies even when the user writes to you in a different language.
+"""
+
+_MIRROR_DIRECTIVE = """
+
+Output Language Requirement:
+Reply in the same language the user wrote their message in. If they write in Hindi, answer in Hindi; in Tamil, answer in Tamil; in Hinglish (Hindi in Latin script), answer in Hinglish. Keep numeric values, units and times in standard numeric form.
+Do NOT translate official SACHET/NDMA emergency instructions -- reproduce official warning text exactly as issued.
+"""
+
+
+def normalize_language(language_preference: Optional[str]) -> str:
+    """Maps a client-supplied language hint onto a supported code, defaulting to English."""
+    if not language_preference:
+        return DEFAULT_OUTPUT_LANGUAGE
+    code = language_preference.strip().lower().replace("_", "-").split("-")[0]
+    return code if code in SUPPORTED_OUTPUT_LANGUAGES else DEFAULT_OUTPUT_LANGUAGE
+
+
+def build_system_instruction(language_preference: Optional[str] = None) -> str:
+    """
+    Returns the system instruction with an explicit output-language directive appended.
+
+    English is the default the UI ships with, so an 'en' preference is treated as
+    "unset" and the assistant mirrors the language the user actually wrote in --
+    otherwise a Hindi question from a user who never touched the selector would be
+    answered in English. Any other selection is an explicit choice and governs.
+    """
+    code = normalize_language(language_preference)
+    if code == DEFAULT_OUTPUT_LANGUAGE:
+        return SYSTEM_INSTRUCTION + _MIRROR_DIRECTIVE
+    return SYSTEM_INSTRUCTION + _LANGUAGE_DIRECTIVE_TEMPLATE.format(
+        language=SUPPORTED_OUTPUT_LANGUAGES[code]
+    )

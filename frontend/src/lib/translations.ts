@@ -65,6 +65,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     unavailable: 'Unavailable',
     cacheHit: 'CACHE HIT',
     liveFeed: 'LIVE FEED',
+    dataLive: 'LIVE',
+    dataStale: 'STALE',
+    ageJustNow: 'JUST NOW',
+    ageMinutesAgo: 'MIN AGO',
+    ageHoursAgo: 'H AGO',
+    dismiss: 'Dismiss',
+    aiOnline: 'Assistant online',
+    myLocation: 'My Location',
+    liveTooltip: 'Time this reading was observed by the meteorological provider.',
+    staleTooltip: 'Weather provider unreachable — showing the last reading received. Treat with caution.',
     timezoneLabel: 'Timezone',
     observedLabel: 'Observed',
     noWeatherDataSelected: 'No Weather Data Selected',
@@ -291,6 +301,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     unavailable: 'अनुपलब्ध',
     cacheHit: 'कैश डेटा',
     liveFeed: 'सजीव फ़ीड',
+    dataLive: 'सजीव',
+    dataStale: 'पुराना',
+    ageJustNow: 'अभी',
+    ageMinutesAgo: 'मिनट पहले',
+    ageHoursAgo: 'घंटे पहले',
+    dismiss: 'बंद करें',
+    aiOnline: 'सहायक ऑनलाइन',
+    myLocation: 'मेरा स्थान',
+    liveTooltip: 'यह रीडिंग मौसम प्रदाता द्वारा दर्ज किए जाने का समय।',
+    staleTooltip: 'मौसम प्रदाता उपलब्ध नहीं — अंतिम प्राप्त रीडिंग दिखाई जा रही है। सावधानी बरतें।',
     timezoneLabel: 'समय क्षेत्र',
     observedLabel: 'अवलोकित',
     noWeatherDataSelected: 'कोई मौसम डेटा नहीं चुना गया',
@@ -517,6 +537,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     unavailable: 'கிடைக்கவில்லை',
     cacheHit: 'தேக்ககத் தரவு',
     liveFeed: 'நேரலைத் தரவு',
+    dataLive: 'நேரலை',
+    dataStale: 'பழையது',
+    ageJustNow: 'இப்போது',
+    ageMinutesAgo: 'நிமிடம் முன்பு',
+    ageHoursAgo: 'மணி முன்பு',
+    dismiss: 'மூடு',
+    aiOnline: 'உதவியாளர் இணைப்பில்',
+    myLocation: 'எனது இடம்',
+    liveTooltip: 'வானிலை வழங்குநரால் இந்த அளவீடு பதிவு செய்யப்பட்ட நேரம்.',
+    staleTooltip: 'வானிலை வழங்குநரைத் தொடர்பு கொள்ள முடியவில்லை — கடைசியாகப் பெறப்பட்ட அளவீடு காட்டப்படுகிறது. கவனத்துடன் பயன்படுத்தவும்.',
     timezoneLabel: 'நேர மண்டலம்',
     observedLabel: 'கணிக்கப்பட்டது',
     noWeatherDataSelected: 'வானிலை தரவு தேர்ந்தெடுக்கப்படவில்லை',
@@ -743,6 +773,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     unavailable: 'అందుబాటులో లేదు',
     cacheHit: 'కాష్ డేటా',
     liveFeed: 'ప్రత్యక్ష ఫీడ్',
+    dataLive: 'ప్రత్యక్షం',
+    dataStale: 'పాతది',
+    ageJustNow: 'ఇప్పుడే',
+    ageMinutesAgo: 'నిమిషాల క్రితం',
+    ageHoursAgo: 'గంటల క్రితం',
+    dismiss: 'మూసివేయి',
+    aiOnline: 'సహాయకుడు ఆన్‌లైన్',
+    myLocation: 'నా స్థానం',
+    liveTooltip: 'వాతావరణ ప్రదాత ఈ రీడింగ్‌ను నమోదు చేసిన సమయం.',
+    staleTooltip: 'వాతావరణ ప్రదాత అందుబాటులో లేరు — చివరిగా అందిన రీడింగ్ చూపబడుతోంది. జాగ్రత్తగా ఉపయోగించండి.',
     timezoneLabel: 'సమయ మండలం',
     observedLabel: 'పరిశీలించిన సమయం',
     noWeatherDataSelected: 'వాతావరణ డేటా ఎంచుకోబడలేదు',
@@ -969,6 +1009,16 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     unavailable: 'অনুপলব্ধ',
     cacheHit: 'ক্যাশ ডেটা',
     liveFeed: 'সরাসরি ফিড',
+    dataLive: 'সরাসরি',
+    dataStale: 'পুরোনো',
+    ageJustNow: 'এইমাত্র',
+    ageMinutesAgo: 'মিনিট আগে',
+    ageHoursAgo: 'ঘণ্টা আগে',
+    dismiss: 'বন্ধ করুন',
+    aiOnline: 'সহকারী অনলাইন',
+    myLocation: 'আমার অবস্থান',
+    liveTooltip: 'আবহাওয়া সরবরাহকারী এই পরিমাপটি রেকর্ড করার সময়।',
+    staleTooltip: 'আবহাওয়া সরবরাহকারীর সঙ্গে সংযোগ নেই — সর্বশেষ প্রাপ্ত পরিমাপ দেখানো হচ্ছে। সতর্কতার সঙ্গে ব্যবহার করুন।',
     timezoneLabel: 'সময় অঞ্চল',
     observedLabel: 'পর্যবেক্ষিত',
     noWeatherDataSelected: 'কোনো আবহাওয়া ডেটা নির্বাচিত হয়নি',
@@ -1131,6 +1181,23 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
     copyrightNotice: '© 2026 WeatherGPT। সমস্ত আবহাওয়া তথ্য যাচাইকৃত উৎস থেকে প্রাপ্ত।',
   },
 };
+
+/**
+ * BCP-47 tags for the supported UI languages. Used both for the document language
+ * declaration (assistive technology picks pronunciation from it) and for
+ * SpeechSynthesis voice selection, so the two can never drift apart.
+ */
+export const LOCALE_TAGS: Record<SupportedLanguage, string> = {
+  en: 'en-IN',
+  hi: 'hi-IN',
+  ta: 'ta-IN',
+  te: 'te-IN',
+  bn: 'bn-IN',
+};
+
+export function localeTag(lang: string = 'en'): string {
+  return LOCALE_TAGS[(lang as SupportedLanguage)] || LOCALE_TAGS.en;
+}
 
 export function t(key: string, lang: string = 'en'): string {
   const selectedLang = (['en', 'hi', 'ta', 'te', 'bn'].includes(lang) ? lang : 'en') as SupportedLanguage;

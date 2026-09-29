@@ -69,6 +69,11 @@ class DisasterAlert(BaseModel):
     polygon_coordinates: Optional[List[List[float]]] = None
     source_url: Optional[str] = None
     is_active: bool = True
+    # SACHET CAP bulletins ship parallel <cap:info> blocks per language. The official
+    # regional-language text is authoritative and must never be machine-translated.
+    headline_local: Optional[str] = Field(None, description="Official regional-language headline as issued")
+    description_local: Optional[str] = Field(None, description="Official regional-language bulletin text as issued")
+    local_language: Optional[str] = Field(None, description="CAP language code of the regional-language fields")
 
 class AlertListResponse(BaseModel):
     source: str = "SACHET/NDMA"

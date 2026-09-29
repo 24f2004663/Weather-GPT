@@ -120,8 +120,15 @@ class TestCoordinateNormalization(unittest.TestCase):
         self.assertNotEqual(key_chennai, key_mumbai)
 
     def test_cache_key_format(self):
+        """The NWP model is part of the key so models cannot share a cache entry."""
         key = _make_weather_cache_key(13.0827, 80.2707, 7, True)
-        self.assertEqual(key, "weather:13.08:80.27:7:True")
+        self.assertEqual(key, "weather:13.08:80.27:7:True:best_match")
+
+    def test_cache_key_includes_the_selected_model(self):
+        self.assertEqual(
+            _make_weather_cache_key(13.0827, 80.2707, 7, True, "gfs_seamless"),
+            "weather:13.08:80.27:7:True:gfs_seamless",
+        )
 
     def test_cache_key_hourly_flag_distinguishes(self):
         key_with = _make_weather_cache_key(13.08, 80.27, 7, True)

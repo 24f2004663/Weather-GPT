@@ -14,7 +14,7 @@ from backend.core.errors import (
     UpstreamTimeoutError,
 )
 from backend.services.ai.base import BaseAIService
-from backend.services.ai.prompts import SYSTEM_INSTRUCTION
+from backend.services.ai.prompts import build_system_instruction
 from backend.services.ai.tools import GEMINI_WEATHER_TOOLS, execute_weather_tool
 from backend.services.ai.session import session_store
 from backend.services.ai.router import gemini_model_router
@@ -90,6 +90,11 @@ class GeminiAIService(BaseAIService):
                     "parts": [{"text": msg.content}]
                 })
 
+        # Honour the caller's selected output language. This is resolved once per
+        # request and reused across every tool iteration and cascade fallback, so a
+        # fallback model cannot quietly answer in a different language.
+        system_instruction = build_system_instruction(request.language_preference)
+
         client = await http_client_manager.get_client()
         headers = {
             "Content-Type": "application/json",
@@ -141,7 +146,7 @@ class GeminiAIService(BaseAIService):
                 body = {
                     "contents": contents,
                     "systemInstruction": {
-                        "parts": [{"text": SYSTEM_INSTRUCTION}]
+                        "parts": [{"text": system_instruction}]
                     },
                     "tools": GEMINI_WEATHER_TOOLS,
                     "generationConfig": {

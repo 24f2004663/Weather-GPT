@@ -97,7 +97,13 @@ export interface NormalizedWeatherResponse {
   timezone: string;
   elevation_m?: number;
   cached: boolean;
+  /** True when the upstream provider failed and this is a last-known reading, up to
+   *  WEATHER_STALE_CACHE_TTL_SECONDS (2h) old. Distinct from `cached`, which only
+   *  says the response avoided a network round-trip. */
+  stale: boolean;
   retrieved_at: string;
+  /** NWP model backing this forecast; "best_match" is the multi-model blend. */
+  weather_model?: string;
 }
 
 export interface MonthlyClimateMetric {

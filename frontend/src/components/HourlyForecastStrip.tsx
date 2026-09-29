@@ -3,6 +3,8 @@
 import React from 'react';
 import { HourlyForecast } from '../types';
 import { t } from '../lib/translations';
+import WeatherIcon from './WeatherIcon';
+import { CloudRain } from 'lucide-react';
 
 interface HourlyForecastStripProps {
   hourly: HourlyForecast[];
@@ -23,53 +25,37 @@ export default function HourlyForecastStrip({ hourly, currentLanguage = 'en' }: 
     }
   };
 
-  const getConditionEmoji = (iconKey: string) => {
-    switch (iconKey) {
-      case 'clear-day': return '☀️';
-      case 'mainly-clear': return '🌤️';
-      case 'partly-cloudy': return '⛅';
-      case 'overcast': return '☁️';
-      case 'fog': return '🌫️';
-      case 'drizzle': return '🌦️';
-      case 'rain-light':
-      case 'rain-moderate': return '🌧️';
-      case 'rain-heavy': return '⛈️';
-      case 'thunderstorm': return '⚡';
-      default: return '🌤️';
-    }
-  };
-
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+    <div className="w-full glass rounded-3xl p-6 shadow-lg space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-white/90">
             {t('timeline24h', currentLanguage)}
           </h3>
-          <p className="text-xs text-slate-400">{t('timelineSub', currentLanguage)}</p>
+          <p className="text-xs text-white/70">{t('timelineSub', currentLanguage)}</p>
         </div>
-        <span className="text-xs text-sky-400 font-mono">{t('horizontalScroll', currentLanguage)}</span>
+        <span className="text-xs text-sky-200 font-mono">{t('horizontalScroll', currentLanguage)}</span>
       </div>
 
       {/* Horizontal Scroll Strip */}
-      <div className="flex gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+      <div className="flex gap-3 overflow-x-auto pb-2 pt-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
         {hourly.slice(0, 24).map((item, idx) => (
           <div
             key={idx}
-            className="flex-shrink-0 w-24 bg-slate-950/70 hover:bg-slate-800/60 border border-slate-800/80 rounded-2xl p-3 text-center flex flex-col justify-between items-center transition-colors"
+            className="flex-shrink-0 w-24 bg-white/5 hover:glass-inset rounded-2xl p-3 text-center flex flex-col justify-between items-center transition-colors"
           >
-            <span className="text-[11px] font-medium text-slate-400">
+            <span className="text-[11px] font-medium text-white/80">
               {formatHour(item.time)}
             </span>
-            <span className="text-2xl my-2 select-none" title={item.weather_condition}>
-              {getConditionEmoji(item.icon_key)}
+            <span className="my-2 text-ink/85" title={item.weather_condition}>
+              <WeatherIcon iconKey={item.icon_key} size={24} />
             </span>
-            <div className="text-sm font-bold text-white">
-              {item.temperature_c.toFixed(1)}°
+            <div className="text-sm font-semibold text-ink tabular-nums">
+              {Math.round(item.temperature_c)}°
             </div>
             {item.precipitation_probability !== null && item.precipitation_probability !== undefined && (
-              <span className="mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-950/80 text-sky-400 border border-sky-850">
-                🌧️ {item.precipitation_probability}%
+              <span className="mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-900/40 text-sky-200 border border-sky-400/20">
+                <CloudRain size={10} strokeWidth={2} aria-hidden="true" className="inline-block mr-1 -mt-0.5" />{item.precipitation_probability}%
               </span>
             )}
           </div>

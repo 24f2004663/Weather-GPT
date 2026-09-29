@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, ChatResponse, LocationResult } from '../types';
 import { sendChatMessage, transcribeAudio } from '../lib/api';
-import { t } from '../lib/translations';
+import { t, localeTag } from '../lib/translations';
+import { Mic, Square, Bot, AlertTriangle, MessageCircle, ArrowUpRight } from 'lucide-react';
 
 interface ChatPanelProps {
   selectedLocation: LocationResult | null;
@@ -252,14 +253,7 @@ export default function ChatPanel({
     const utterance = new SpeechSynthesisUtterance(text);
 
     // Language code mapping
-    const langMap: Record<string, string> = {
-      en: 'en-IN',
-      hi: 'hi-IN',
-      ta: 'ta-IN',
-      te: 'te-IN',
-      bn: 'bn-IN',
-    };
-    utterance.lang = langMap[currentLanguage] || 'en-US';
+    utterance.lang = localeTag(currentLanguage);
     utterance.rate = 1.0;
 
     utterance.onend = () => setSpeakingIdx(null);
@@ -277,19 +271,27 @@ export default function ChatPanel({
   ];
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 flex flex-col h-[740px] relative overflow-hidden">
+    <div className="w-full glass rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 flex flex-col h-[740px] relative overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
+      <div className="flex items-center justify-between border-b border-white/20 pb-3.5">
         <div className="flex items-center space-x-2.5">
           <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center font-bold text-sm text-white shadow-md shadow-sky-500/20">
-            🤖
+            <Bot size={16} strokeWidth={2} aria-hidden="true" />
           </div>
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <span>{t('aiAssistant', currentLanguage)}</span>
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              {/* Static, not animate-pulse. This sits inside a backdrop-filter pane, so an
+                  infinite animation re-rasterizes the whole blurred panel every frame —
+                  visible as the panel shimmering, and a constant compositor cost. A ring
+                  conveys "online" without animating. */}
+              <span
+                className="h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30"
+                aria-label={t('aiOnline', currentLanguage)}
+                role="img"
+              ></span>
             </h3>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-white/70">
               {t('aiSub', currentLanguage)}
             </p>
           </div>
@@ -300,7 +302,7 @@ export default function ChatPanel({
             <button
               type="button"
               onClick={() => setShowReferenced(!showReferenced)}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 font-mono text-[11px] border border-slate-700 transition-colors"
+              className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-sky-300 font-mono text-[11px] border border-white/20 transition-colors backdrop-blur-md"
             >
               {showReferenced ? t('hideProvenance', currentLanguage) : t('viewProvenance', currentLanguage)}
             </button>
@@ -308,7 +310,7 @@ export default function ChatPanel({
           <button
             type="button"
             onClick={handleResetChat}
-            className="text-slate-400 hover:text-slate-200 transition-colors text-xs font-medium"
+            className="text-white/70 hover:text-white transition-colors text-xs font-medium"
             title={t('resetConversation', currentLanguage)}
           >
             {t('clearChat', currentLanguage)}
@@ -318,7 +320,7 @@ export default function ChatPanel({
 
       {/* Provenance Data Viewer Overlay */}
       {showReferenced && referencedData && (
-        <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 max-h-40 overflow-y-auto">
+        <div data-surface="dark" className="p-3 bg-black/40 backdrop-blur-2xl border border-white/20 rounded-xl text-xs font-mono text-white/90 max-h-40 overflow-y-auto">
           <div className="font-bold text-sky-400 mb-1">{t('referencedPayload', currentLanguage)}</div>
           <pre className="text-[10px] leading-relaxed whitespace-pre-wrap">{JSON.stringify(referencedData, null, 2)}</pre>
         </div>
@@ -326,14 +328,14 @@ export default function ChatPanel({
 
       {/* Voice Error Notification */}
       {voiceError && (
-        <div className="p-2.5 bg-rose-950/80 border border-rose-800 rounded-xl text-xs text-rose-300 flex justify-between items-center">
-          <span>⚠️ {voiceError}</span>
+        <div role="alert" className="p-2.5 bg-rose-950/80 border border-rose-800 rounded-xl text-xs text-rose-300 flex justify-between items-center">
+          <span className="inline-flex items-center gap-1.5"><AlertTriangle size={13} strokeWidth={2} aria-hidden="true" />{voiceError}</span>
           <button type="button" onClick={() => setVoiceError(null)} className="text-rose-400 font-bold">×</button>
         </div>
       )}
 
       {/* Message Thread */}
-      <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900 font-sans text-sm">
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent font-sans text-sm">
         {messages.map((msg, idx) => (
           <div
             key={idx}
@@ -342,17 +344,17 @@ export default function ChatPanel({
             <div
               className={`max-w-[88%] rounded-2xl px-4 py-3 shadow-md ${
                 msg.role === 'user'
-                  ? 'bg-sky-600 text-white rounded-br-none'
-                  : 'bg-slate-950/80 text-slate-200 border border-slate-800/90 rounded-bl-none'
+                  ? 'bg-sky-600 text-[#fff] rounded-br-none'
+                  : 'bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-bl-none'
               }`}
             >
               <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
 
               {/* Action Bar for Assistant Messages (Source attribution + TTS Audio Button) */}
               {msg.role === 'assistant' && (
-                <div className="mt-2.5 pt-1.5 border-t border-slate-800/60 text-[10px] text-slate-400 flex items-center justify-between gap-2">
+                <div className="mt-2.5 pt-1.5 border-t border-white/10 text-[10px] text-white/60 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 truncate">
-                    <span className="text-slate-500">{t('sourcesLabel', currentLanguage)}</span>
+                    <span className="text-white/50">{t('sourcesLabel', currentLanguage)}</span>
                     <span className="font-medium text-sky-300 truncate">
                       {msg.source_attribution?.join(' • ') || t('verifiedFeeds', currentLanguage)}
                     </span>
@@ -362,7 +364,7 @@ export default function ChatPanel({
                   <button
                     type="button"
                     onClick={() => handleToggleSpeak(msg.content, idx)}
-                    className="flex-shrink-0 px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-[10px] border border-slate-700 transition-colors flex items-center gap-1"
+                    className="flex-shrink-0 px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-white/80 font-mono text-[10px] border border-white/20 transition-colors flex items-center gap-1"
                     title={t('readAloudTitle', currentLanguage)}
                   >
                     <span>{speakingIdx === idx ? t('stopListening', currentLanguage) : t('readAloud', currentLanguage)}</span>
@@ -374,14 +376,14 @@ export default function ChatPanel({
         ))}
 
         {isLoading && (
-          <div className="flex items-center space-x-2 text-xs text-slate-400 bg-slate-950/50 p-3 rounded-2xl max-w-xs border border-slate-800/80">
+          <div className="flex items-center space-x-2 text-xs text-white/70 bg-white/10 backdrop-blur-md p-3 rounded-2xl max-w-xs border border-white/20">
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping"></span>
             <span>{t('queryingWeather', currentLanguage)}</span>
           </div>
         )}
 
         {isTranscribing && (
-          <div className="flex items-center space-x-2 text-xs text-sky-300 bg-slate-950/50 p-3 rounded-2xl max-w-xs border border-sky-800/80">
+          <div className="flex items-center space-x-2 text-xs text-sky-300 bg-white/10 backdrop-blur-md p-3 rounded-2xl max-w-xs border border-sky-400/30">
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping"></span>
             <span>{t('transcribingSpeech', currentLanguage)}</span>
           </div>
@@ -397,7 +399,7 @@ export default function ChatPanel({
             type="button"
             onClick={() => handleSend(chip)}
             disabled={isLoading || isRecording || isTranscribing}
-            className="flex-shrink-0 px-2.5 py-1 rounded-full bg-slate-950/80 hover:bg-slate-800 border border-slate-800 text-slate-300 text-[11px] transition-colors disabled:opacity-50"
+            className="flex-shrink-0 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 text-[11px] transition-colors disabled:opacity-50 backdrop-blur-md"
           >
             {chip}
           </button>
@@ -414,8 +416,8 @@ export default function ChatPanel({
           onKeyDown={handleKeyDown}
           placeholder={isRecording ? t('listeningVoice', currentLanguage) : t('typeMessage', currentLanguage)}
           disabled={isLoading || isRecording}
-          className={`w-full bg-slate-950 border focus:border-sky-500 rounded-2xl px-4 py-2.5 pr-28 text-sm text-white placeholder-slate-500 focus:outline-none resize-none transition-colors ${
-            isRecording ? 'border-rose-500 bg-rose-950/20 animate-pulse' : 'border-slate-800'
+          className={`w-full bg-white/5 backdrop-blur-md border focus:border-white/40 rounded-2xl px-4 py-2.5 pr-28 text-sm text-white placeholder-white/50 focus:outline-none resize-none transition-colors ${
+            isRecording ? 'border-rose-500 bg-rose-950/40 animate-pulse' : 'border-white/20'
           }`}
           aria-label={t('aiAssistant', currentLanguage)}
         />
@@ -428,12 +430,18 @@ export default function ChatPanel({
             disabled={isLoading || isTranscribing}
             className={`h-7 w-7 rounded-xl flex items-center justify-center text-xs font-medium transition-all ${
               isRecording
-                ? 'bg-rose-600 text-white animate-bounce shadow-lg shadow-rose-600/30'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                ? 'bg-rose-600 text-[#fff] animate-bounce shadow-lg shadow-rose-600/30'
+                : 'bg-white/10 hover:bg-white/20 text-white/80 border border-white/20 backdrop-blur-md'
             }`}
             title={isRecording ? t('stopRecording', currentLanguage) : t('voiceInput', currentLanguage)}
+            aria-label={isRecording ? t('stopRecording', currentLanguage) : t('voiceInput', currentLanguage)}
+            aria-pressed={isRecording}
           >
-            <span>{isRecording ? '⏹️' : '🎙️'}</span>
+            {/* The glyph is decorative; the accessible name comes from aria-label above,
+                otherwise a screen reader announces the raw emoji or nothing at all. */}
+            {isRecording
+              ? <Square size={13} strokeWidth={2.5} fill="currentColor" aria-hidden="true" />
+              : <Mic size={14} strokeWidth={2} aria-hidden="true" />}
           </button>
 
           {/* Send Button */}
@@ -441,7 +449,7 @@ export default function ChatPanel({
             type="button"
             onClick={() => handleSend()}
             disabled={isLoading || isRecording || !inputPrompt.trim()}
-            className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-semibold px-3.5 py-1.5 rounded-xl text-xs transition-all shadow-lg shadow-sky-600/20"
+            className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-[#fff] font-semibold px-3.5 py-1.5 rounded-xl text-xs transition-all shadow-lg shadow-sky-600/20"
           >
             {t('send', currentLanguage)}
           </button>
@@ -450,10 +458,10 @@ export default function ChatPanel({
 
       {/* WhatsApp Chatbot CTA Card */}
       <div className="pt-1">
-        <div className="bg-slate-950/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-2xl p-3 transition-all shadow-md flex items-center justify-between gap-3">
+        <div className="glass-inset hover:border-white/20 rounded-2xl p-3 transition-colors shadow-md flex items-center justify-between gap-3">
           <div className="flex items-center space-x-2.5 min-w-0">
             <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center text-sm text-white shadow-md shadow-emerald-500/20 flex-shrink-0">
-              💬
+              <MessageCircle size={16} strokeWidth={2} aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
@@ -468,7 +476,7 @@ export default function ChatPanel({
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-white/70 truncate">
                 {t('chatWithWhatsAppDesc', currentLanguage)}
               </p>
             </div>
@@ -477,10 +485,10 @@ export default function ChatPanel({
           <button
             type="button"
             onClick={handleWhatsAppClick}
-            className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1"
+            className="flex-shrink-0 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-[#fff] font-semibold text-xs transition-all shadow-md shadow-emerald-600/20 flex items-center gap-1"
           >
             <span>{t('tryWhatsAppButton', currentLanguage)}</span>
-            <span className="text-[10px]">↗</span>
+            <ArrowUpRight size={12} strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
       </div>

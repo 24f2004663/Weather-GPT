@@ -2,6 +2,7 @@ import {
   HealthStatus,
   ConfigStatus,
   LocationSearchResponse,
+  LocationResult,
   NormalizedWeatherResponse,
   NasaPowerClimateResponse,
   AlertListResponse,
@@ -63,6 +64,29 @@ export async function searchLocations(query: string, count: number = 5): Promise
     throw new Error(`Location search failed: HTTP ${res.status}`);
   }
   return await res.json();
+}
+
+/**
+ * Resolves device coordinates to a place name.
+ *
+ * Returns null when the point cannot be named (open water, unmapped terrain) or when the
+ * lookup fails — the caller keeps whatever fallback it had. A failed reverse lookup must
+ * never block showing the weather, so this never throws.
+ */
+export async function reverseGeocode(lat: number, lon: number): Promise<LocationResult | null> {
+  try {
+    const url = `${API_BASE_URL}/api/location/reverse?lat=${lat}&lon=${lon}`;
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'default',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && typeof data.name === 'string' ? (data as LocationResult) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getWeatherForecast(

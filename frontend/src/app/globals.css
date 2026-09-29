@@ -2,17 +2,220 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 248, 250, 252;
-  --background-start-rgb: 15, 23, 42;
-  --background-end-rgb: 2, 6, 23;
+/*
+ * Theme tokens.
+ *
+ * `data-surface` on <html> says how bright the backdrop behind the UI currently is.
+ * The backdrop is a weather gradient, so it is not simply day vs night: a thunderstorm
+ * at noon is darker than a clear night sky. Ink and glass are both derived from it, so
+ * text contrast holds in every weather state rather than only at the two extremes.
+ */
+/* Scoped by plain attribute selector, not :root, so a panel that is dark in BOTH
+   themes — a modal over a scrim, the search dropdown, the provenance viewer — can pin
+   data-surface="dark" on itself and have its subtree inherit the dark tokens. */
+:root,
+[data-surface='dark'] {
+  /* Light ink on a dark backdrop. Zinc rather than slate so the neutrals stay neutral —
+     slate carries a blue cast that reads as a tint against a true charcoal. */
+  --ink-rgb: 250 250 250;
+  --glass-rgb: 255 255 255;
+
+  --glass-tint: 0.10;
+  --glass-tint-strong: 0.16;
+  --glass-border: 0.22;
+  --glass-sheen: 0.30;
+  --glass-shadow: 0 8px 32px rgba(9, 9, 11, 0.4);
+}
+
+[data-surface='light'] {
+  /* Mid slate rather than near-black. Dark enough to hold contrast on the brightest
+     part of the sky gradient, light enough that a page of it does not read as heavy. */
+  --ink-rgb: 51 65 85;
+  --glass-rgb: 15 23 42;
+
+  /* A dark tint over a bright sky reads as smoked glass; it needs less opacity than
+     a white tint does over a dark one, or the tiles turn muddy. Kept low so the tiles
+     lighten the backdrop rather than darkening it. */
+  --glass-tint: 0.05;
+  --glass-tint-strong: 0.08;
+  --glass-border: 0.14;
+  --glass-sheen: 0.7;
+  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.14);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: #020617;
+  color: rgb(var(--ink-rgb));
+  background: #09090b;  /* zinc-950, matches the charcoal backdrop */
   min-height: 100vh;
+  transition: color 700ms ease;
 }
+
+@layer components {
+  /*
+   * Liquid glass tile.
+   *
+   * Four stacked effects: a saturating blur of whatever is behind, a flat tint, a
+   * top-down sheen that fakes light falling across the pane, and a 1px inset highlight
+   * on the top edge that reads as the lit rim of a thick piece of glass.
+   */
+  /*
+   * Every glass pane is pinned to its own compositor layer via translateZ(0).
+   *
+   * A backdrop-filter element re-rasterizes its blurred backdrop whenever the compositor
+   * decides its layer is dirty. Without an explicit layer the browser keeps merging these
+   * panes into the shared scrolling layer and re-blurring on unrelated repaints, which
+   * shows up as the card flickering. Promoting them makes the blur a one-time raster that
+   * survives repaints elsewhere on the page. backface-visibility pins the same layer in
+   * Safari, which ignores translateZ alone for this purpose.
+   */
+  .glass,
+  .glass-strong,
+  .glass-inset {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .glass {
+    position: relative;
+    background-color: rgb(var(--glass-rgb) / var(--glass-tint));
+    background-image: linear-gradient(
+      160deg,
+      rgb(255 255 255 / calc(var(--glass-sheen) * 0.18)) 0%,
+      rgb(255 255 255 / 0) 42%,
+      rgb(255 255 255 / 0) 100%
+    );
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgb(var(--glass-rgb) / var(--glass-border));
+    box-shadow:
+      var(--glass-shadow),
+      inset 0 1px 0 rgb(255 255 255 / calc(var(--glass-sheen) * 0.5));
+    transition: background-color 700ms ease, border-color 700ms ease,
+      box-shadow 700ms ease;
+  }
+
+  /* Denser pane for primary surfaces that sit above the rest of the page. */
+  .glass-strong {
+    background-color: rgb(var(--glass-rgb) / var(--glass-tint-strong));
+    background-image: linear-gradient(
+      160deg,
+      rgb(255 255 255 / calc(var(--glass-sheen) * 0.26)) 0%,
+      rgb(255 255 255 / 0) 48%,
+      rgb(255 255 255 / 0) 100%
+    );
+    backdrop-filter: blur(20px) saturate(170%);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    border: 1px solid rgb(var(--glass-rgb) / calc(var(--glass-border) + 0.06));
+    box-shadow:
+      var(--glass-shadow),
+      inset 0 1px 0 rgb(255 255 255 / calc(var(--glass-sheen) * 0.6));
+    transition: background-color 700ms ease, border-color 700ms ease,
+      box-shadow 700ms ease;
+  }
+
+  /* Inset pane for elements nested inside a .glass tile. */
+  .glass-inset {
+    background-color: rgb(var(--glass-rgb) / calc(var(--glass-tint) * 0.6));
+    border: 1px solid rgb(var(--glass-rgb) / calc(var(--glass-border) * 0.7));
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    transition: background-color 700ms ease, border-color 700ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .glass,
+  .glass-strong,
+  .glass-inset {
+    transition: none;
+  }
+}
+
+/*
+ * Accent chips (severity pills, feed badges, status tags).
+ *
+ * These are written in the markup as bg-{accent}-950 / text-{accent}-300 /
+ * border-{accent}-800 — a dark chip, which reads as a heavy hole punched in a bright
+ * daytime page. Rather than rewrite ~30 call sites, the accent ramp is inverted here:
+ * a dark chip with light text at night, a soft tinted chip with dark text by day.
+ *
+ * Driven through inherited custom properties rather than a descendant selector on
+ * [data-surface='light'], because a descendant selector would still match chips inside
+ * a panel that pinned data-surface="dark" on itself. Variables resolve against the
+ * NEAREST themed ancestor, so those panels keep their dark chips correctly.
+ *
+ * Declared after @tailwind utilities so these win on source order at equal specificity.
+ */
+:root,
+[data-surface='dark'] {
+  --c-sky-bg: #082f49;    --c-sky-fg: #7dd3fc;    --c-sky-bd: #075985;
+  --c-emerald-bg: #022c22; --c-emerald-fg: #6ee7b7; --c-emerald-bd: #065f46;
+  --c-amber-bg: #451a03;  --c-amber-fg: #fcd34d;  --c-amber-bd: #92400e;
+  --c-rose-bg: #4c0519;   --c-rose-fg: #fda4af;   --c-rose-bd: #9f1239;
+  --c-yellow-bg: #422006; --c-yellow-fg: #fde047; --c-yellow-bd: #854d0e;
+  --c-indigo-bg: #1e1b4b; --c-indigo-fg: #a5b4fc; --c-indigo-bd: #3730a3;
+  --c-cyan-bg: #164e63;   --c-cyan-fg: #a5f3fc;   --c-cyan-bd: #0e7490;
+  --c-purple-bg: #581c87; --c-purple-fg: #e9d5ff; --c-purple-bd: #7e22ce;
+  --c-slate-bg: #020617;
+}
+
+[data-surface='light'] {
+  --c-sky-bg: #e0f2fe;    --c-sky-fg: #075985;    --c-sky-bd: #7dd3fc;
+  --c-emerald-bg: #d1fae5; --c-emerald-fg: #065f46; --c-emerald-bd: #6ee7b7;
+  --c-amber-bg: #fef3c7;  --c-amber-fg: #92400e;  --c-amber-bd: #fcd34d;
+  --c-rose-bg: #ffe4e6;   --c-rose-fg: #9f1239;   --c-rose-bd: #fda4af;
+  --c-yellow-bg: #fef9c3; --c-yellow-fg: #854d0e; --c-yellow-bd: #fde047;
+  --c-indigo-bg: #e0e7ff; --c-indigo-fg: #3730a3; --c-indigo-bd: #a5b4fc;
+  --c-cyan-bg: #cffafe;   --c-cyan-fg: #0e7490;   --c-cyan-bd: #67e8f9;
+  --c-purple-bg: #f3e8ff; --c-purple-fg: #7e22ce; --c-purple-bd: #d8b4fe;
+  --c-slate-bg: #f1f5f9;
+}
+
+.bg-sky-950     { background-color: var(--c-sky-bg); }
+.bg-emerald-950 { background-color: var(--c-emerald-bg); }
+.bg-amber-950   { background-color: var(--c-amber-bg); }
+.bg-rose-950    { background-color: var(--c-rose-bg); }
+.bg-yellow-950  { background-color: var(--c-yellow-bg); }
+.bg-indigo-950  { background-color: var(--c-indigo-bg); }
+.bg-slate-950   { background-color: var(--c-slate-bg); }
+
+/* Alpha variants keep their translucency by compositing the tint over the glass. */
+.bg-sky-950\/80     { background-color: color-mix(in srgb, var(--c-sky-bg) 80%, transparent); }
+.bg-emerald-950\/80 { background-color: color-mix(in srgb, var(--c-emerald-bg) 80%, transparent); }
+.bg-amber-950\/80   { background-color: color-mix(in srgb, var(--c-amber-bg) 80%, transparent); }
+.bg-amber-950\/70   { background-color: color-mix(in srgb, var(--c-amber-bg) 70%, transparent); }
+.bg-rose-950\/95    { background-color: color-mix(in srgb, var(--c-rose-bg) 95%, transparent); }
+.bg-rose-950\/90    { background-color: color-mix(in srgb, var(--c-rose-bg) 90%, transparent); }
+.bg-rose-950\/80    { background-color: color-mix(in srgb, var(--c-rose-bg) 80%, transparent); }
+.bg-rose-950\/60    { background-color: color-mix(in srgb, var(--c-rose-bg) 60%, transparent); }
+.bg-rose-950\/40    { background-color: color-mix(in srgb, var(--c-rose-bg) 40%, transparent); }
+
+/* Tinted accent panels behind the 100/200 text steps. */
+.bg-sky-900\/40    { background-color: color-mix(in srgb, var(--c-sky-bg) 40%, transparent); }
+.bg-amber-900\/40  { background-color: color-mix(in srgb, var(--c-amber-bg) 40%, transparent); }
+.bg-amber-900\/80  { background-color: color-mix(in srgb, var(--c-amber-bg) 80%, transparent); }
+.bg-cyan-900\/40   { background-color: color-mix(in srgb, var(--c-cyan-bg) 40%, transparent); }
+.bg-purple-900\/40 { background-color: color-mix(in srgb, var(--c-purple-bg) 40%, transparent); }
+
+/* The 100/200 steps sit on {accent}-900/40 tinted panels, which invert too, so their
+   text has to travel with them or it ends up pale-on-pale. */
+.text-sky-200, .text-sky-300, .text-sky-400             { color: var(--c-sky-fg); }
+.text-emerald-200, .text-emerald-300, .text-emerald-400 { color: var(--c-emerald-fg); }
+.text-amber-100, .text-amber-200, .text-amber-300, .text-amber-400 { color: var(--c-amber-fg); }
+.text-rose-200, .text-rose-300                          { color: var(--c-rose-fg); }
+.text-yellow-300                                        { color: var(--c-yellow-fg); }
+.text-indigo-300                                        { color: var(--c-indigo-fg); }
+.text-cyan-200                                          { color: var(--c-cyan-fg); }
+.text-purple-200                                        { color: var(--c-purple-fg); }
+
+.border-sky-800     { border-color: var(--c-sky-bd); }
+.border-emerald-800 { border-color: var(--c-emerald-bd); }
+.border-amber-800   { border-color: var(--c-amber-bd); }
+.border-rose-800    { border-color: var(--c-rose-bd); }
+.border-yellow-800  { border-color: var(--c-yellow-bd); }
+.border-indigo-800  { border-color: var(--c-indigo-bd); }
 
 /* Custom scrollbars for clean timeline and messages */
 ::-webkit-scrollbar {
@@ -21,14 +224,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: rgb(var(--glass-rgb) / 0.06);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: rgb(var(--glass-rgb) / 0.28);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: rgb(var(--glass-rgb) / 0.42);
 }

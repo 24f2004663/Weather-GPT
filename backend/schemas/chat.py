@@ -12,7 +12,12 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage] = Field(..., min_items=1, max_items=50)
     user_location: Optional[str] = Field(default=None, description="Optional current user place name hint")
     coordinates: Optional[Dict[str, float]] = Field(default=None, description="Optional current lat/lon coordinates")
-    language_preference: str = Field(default="en", description="Preferred output language")
+    language_preference: str = Field(
+        default="en",
+        max_length=16,
+        description="Preferred output language as a BCP-47 code or ISO 639-1 prefix (e.g. 'hi', 'ta-IN'). "
+                    "Unrecognized values fall back to English.",
+    )
     session_id: Optional[str] = Field(default=None, description="Conversation session token")
 
 class ToolCallLog(BaseModel):

@@ -38,7 +38,7 @@ export default function ClimateSection({
   const { annual_averages, monthly_data, location, cached } = climate;
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
+    <div className="w-full glass rounded-3xl p-6 md:p-8 shadow-lg space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="flex items-center space-x-2">
@@ -52,7 +52,7 @@ export default function ClimateSection({
           <h3 className="text-xl font-bold text-white mt-1">
             {t('historicalClimateProfileFor', currentLanguage)} {location.name}
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-white/70">
             {t('longTermAverages', currentLanguage)}
           </p>
         </div>
@@ -68,56 +68,56 @@ export default function ClimateSection({
 
       {/* Annual Summary Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
-        <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-2xl">
-          <div className="text-slate-400 font-medium">{t('avgTemperature', currentLanguage)}</div>
+        <div className="glass-inset p-3.5 rounded-2xl">
+          <div className="text-white/70 font-medium">{t('avgTemperature', currentLanguage)}</div>
           <div className="text-base font-bold text-white mt-1">
             {annual_averages['T2M'] !== undefined ? `${annual_averages['T2M'].toFixed(1)}°C` : 'N/A'}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{t('annualMean', currentLanguage)}</div>
+          <div className="text-[10px] text-white/50 mt-0.5">{t('annualMean', currentLanguage)}</div>
         </div>
 
-        <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-2xl">
-          <div className="text-slate-400 font-medium">{t('avgPrecipitation', currentLanguage)}</div>
+        <div className="glass-inset p-3.5 rounded-2xl">
+          <div className="text-white/70 font-medium">{t('avgPrecipitation', currentLanguage)}</div>
           <div className="text-base font-bold text-white mt-1">
             {annual_averages['PRECTOTCORR'] !== undefined ? `${annual_averages['PRECTOTCORR'].toFixed(1)} mm/day` : 'N/A'}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{t('precipitationRate', currentLanguage)}</div>
+          <div className="text-[10px] text-white/50 mt-0.5">{t('precipitationRate', currentLanguage)}</div>
         </div>
 
-        <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-2xl">
-          <div className="text-slate-400 font-medium">{t('solarRadiation', currentLanguage)}</div>
+        <div className="glass-inset p-3.5 rounded-2xl">
+          <div className="text-white/70 font-medium">{t('solarRadiation', currentLanguage)}</div>
           <div className="text-base font-bold text-white mt-1">
             {annual_averages['ALLSKY_SFC_SW_DWN'] !== undefined ? `${annual_averages['ALLSKY_SFC_SW_DWN'].toFixed(1)} kWh/m²` : 'N/A'}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{t('surfaceIrradiance', currentLanguage)}</div>
+          <div className="text-[10px] text-white/50 mt-0.5">{t('surfaceIrradiance', currentLanguage)}</div>
         </div>
 
-        <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-2xl">
-          <div className="text-slate-400 font-medium">{t('relativeHumidity', currentLanguage)}</div>
+        <div className="glass-inset p-3.5 rounded-2xl">
+          <div className="text-white/70 font-medium">{t('relativeHumidity', currentLanguage)}</div>
           <div className="text-base font-bold text-white mt-1">
             {annual_averages['RH2M'] !== undefined ? `${annual_averages['RH2M'].toFixed(0)}%` : 'N/A'}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{t('meanHumidity2m', currentLanguage)}</div>
+          <div className="text-[10px] text-white/50 mt-0.5">{t('meanHumidity2m', currentLanguage)}</div>
         </div>
 
-        <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-2xl">
-          <div className="text-slate-400 font-medium">{t('avgWindSpeed', currentLanguage)}</div>
+        <div className="glass-inset p-3.5 rounded-2xl">
+          <div className="text-white/70 font-medium">{t('avgWindSpeed', currentLanguage)}</div>
           <div className="text-base font-bold text-white mt-1">
             {annual_averages['WS10M'] !== undefined ? `${annual_averages['WS10M'].toFixed(1)} m/s` : 'N/A'}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{t('windSpeed10m', currentLanguage)}</div>
+          <div className="text-[10px] text-white/50 mt-0.5">{t('windSpeed10m', currentLanguage)}</div>
         </div>
       </div>
 
       {/* Expandable Monthly Breakdown Table */}
       {expanded && monthly_data && monthly_data.length > 0 && (
         <div className="space-y-3 pt-2 border-t border-slate-800">
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-white/70">
             {t('monthlyClimateProfile', currentLanguage)}
           </h4>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left text-slate-300">
-              <thead className="text-[11px] text-slate-400 uppercase bg-slate-950/80 border-b border-slate-800 font-mono">
+            <table className="w-full text-xs text-left text-white/80">
+              <thead className="text-[11px] text-white/70 uppercase bg-white/10 border-b border-white/20 font-mono">
                 <tr>
                   <th className="px-3 py-2">{t('monthHeader', currentLanguage)}</th>
                   <th className="px-3 py-2">{t('avgTempHeader', currentLanguage)}</th>
@@ -127,9 +127,9 @@ export default function ClimateSection({
                   <th className="px-3 py-2">{t('windHeader', currentLanguage)}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
+              <tbody className="divide-y divide-white/10 font-mono">
                 {monthly_data.map((m) => (
-                  <tr key={m.month} className="hover:bg-slate-800/40">
+                  <tr key={m.month} className="hover:bg-white/10">
                     <td className="px-3 py-2 font-sans font-medium text-white">{m.month}</td>
                     <td className="px-3 py-2">{m.temperature_2m_c !== null && m.temperature_2m_c !== undefined ? m.temperature_2m_c.toFixed(1) : '-'}</td>
                     <td className="px-3 py-2">{m.precipitation_mm_day !== null && m.precipitation_mm_day !== undefined ? m.precipitation_mm_day.toFixed(1) : '-'}</td>
