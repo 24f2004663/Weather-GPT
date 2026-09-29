@@ -103,6 +103,29 @@ class TestBuildSystemInstruction(unittest.TestCase):
         self.assertIn("numeric form", build_system_instruction("hi"))
 
 
+class TestNeverInventALocation(unittest.TestCase):
+    """
+    Regression: with no rule covering "no location supplied", the model fabricated one
+    and passed it to resolve_location — observed as query="Bengaluru" and query="Delhi"
+    for questions that named no place. The WhatsApp channel sends no coordinates at all,
+    so every message there hit that condition.
+    """
+
+    def test_instruction_forbids_inventing_a_location(self):
+        instruction = build_system_instruction("en")
+        self.assertIn("NEVER INVENT A LOCATION", instruction)
+
+    def test_instruction_says_to_ask_instead_of_guessing(self):
+        instruction = build_system_instruction("en")
+        self.assertIn("ASK which city or district", instruction)
+        self.assertIn("Do NOT pass a guessed place name to resolve_location", instruction)
+
+    def test_rule_is_present_for_every_language(self):
+        for code in ("en", "hi", "ta", "bn"):
+            with self.subTest(code=code):
+                self.assertIn("NEVER INVENT A LOCATION", build_system_instruction(code))
+
+
 class TestLanguageReachesTheModelRequest(unittest.IsolatedAsyncioTestCase):
     """
     End-to-end wiring check: the selected language must appear in the actual outbound
