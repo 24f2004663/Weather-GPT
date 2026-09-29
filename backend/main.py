@@ -503,7 +503,17 @@ async def verify_subscriber_phone(
 ):
     response.headers["Cache-Control"] = "no-store, private"
     is_active = await notification_orchestrator.is_phone_subscribed(phone)
-    return {"phone": phone, "is_subscribed": is_active}
+    # The registered district/state is returned alongside so GPS-less channels (the
+    # WhatsApp sidecar) can pass a real location into /api/chat instead of leaving the
+    # assistant to infer one.
+    registered_location = (
+        await notification_orchestrator.get_registered_location(phone) if is_active else None
+    )
+    return {
+        "phone": phone,
+        "is_subscribed": is_active,
+        "registered_location": registered_location,
+    }
 
 @app.get("/api/notifications/providers/status", response_model=ProviderStatusResponse, tags=["Notifications"])
 async def get_notification_providers_status(response: FastAPIResponse):

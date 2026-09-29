@@ -230,7 +230,7 @@ function checkRateLimit(phone) {
  * @param {string} sessionId - Per-sender session token
  * @returns {Promise<string>} Assistant response text
  */
-async function callWeatherGPTChat(messageText, sessionId) {
+async function callWeatherGPTChat(messageText, sessionId, userLocation) {
   const chatRequest = {
     messages: [
       {
@@ -240,6 +240,14 @@ async function callWeatherGPTChat(messageText, sessionId) {
     ],
     session_id: sessionId,
   };
+
+  // WhatsApp cannot send GPS, so without this the assistant gets no location at all —
+  // and an assistant holding a location-shaped tool with no location will invent a
+  // plausible city rather than ask. Sending the district/state the subscriber actually
+  // registered for alerts turns that guess into their real place.
+  if (userLocation) {
+    chatRequest.user_location = userLocation;
+  }
 
   const url = new URL('/api/chat', CONFIG.apiUrl);
   const payload = JSON.stringify(chatRequest);
@@ -334,6 +342,40 @@ function checkBackendSubscriber(phone) {
  * Performs a fresh query on EVERY incoming message without in-memory caching.
  * Fails closed on network or backend errors.
  */
+/**
+ * The district/state this subscriber registered for, or null if unknown.
+ *
+ * Deliberately separate from checkBackendSubscriber, which must keep returning a plain
+ * boolean. Never throws and never blocks a reply: if the location cannot be resolved the
+ * caller sends none, and the assistant asks the user instead of guessing.
+ */
+function fetchSubscriberLocation(phone) {
+  const url = new URL('/api/notifications/subscriber/verify', CONFIG.apiUrl);
+  url.searchParams.set('phone', phone);
+
+  return new Promise((resolve) => {
+    const transport = url.protocol === 'https:' ? https : http;
+    const req = transport.request(url, { method: 'GET', timeout: 8000 }, (res) => {
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(body).registered_location || null);
+          } catch (_) {
+            resolve(null);
+          }
+        } else {
+          resolve(null);
+        }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+    req.end();
+  });
+}
+
 async function isAuthorizedSender(phone) {
   if (!phone || phone.length < 7) return false;
 
@@ -425,8 +467,11 @@ async function handleMessage(socket, msg) {
   log('chat_request', { phone_suffix: phoneSuffix, session_id: sessionId });
 
   try {
+    const locFn = (module.exports && module.exports.fetchSubscriberLocation) ? module.exports.fetchSubscriberLocation : fetchSubscriberLocation;
+    const registeredLocation = await locFn(phone);
+
     const chatFn = (module.exports && module.exports.callWeatherGPTChat) ? module.exports.callWeatherGPTChat : callWeatherGPTChat;
-    const response = await chatFn(rawText, sessionId);
+    const response = await chatFn(rawText, sessionId, registeredLocation);
     log('chat_response', { phone_suffix: phoneSuffix, response_length: response.length });
 
     // 9. Send response back via WhatsApp
@@ -581,6 +626,7 @@ module.exports = {
   phoneToSessionId,
   checkRateLimit,
   callWeatherGPTChat,
+  fetchSubscriberLocation,
   handleMessage,
   rateLimitWindows,
   log,

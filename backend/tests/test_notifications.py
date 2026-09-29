@@ -90,6 +90,30 @@ class MockSupabaseClient:
                     return True
         return False
 
+    async def get_registered_location_by_phone(self, phone: str):
+        """Mirrors the real lookup: the district/state a subscriber registered for."""
+        clean_target = "".join(c for c in phone if c.isdigit())
+        if not clean_target:
+            return None
+        for sub in self._db.values():
+            if not sub.is_opted_in:
+                continue
+            for cp in [sub.phone_number, sub.whatsapp_number, sub.user_identifier]:
+                if not cp:
+                    continue
+                clean_cp = "".join(c for c in str(cp) if c.isdigit())
+                matched = clean_cp == clean_target or (
+                    len(clean_cp) >= 10 and len(clean_target) >= 10
+                    and clean_cp[-10:] == clean_target[-10:]
+                )
+                if matched:
+                    parts = [p for p in (
+                        sub.target_districts[0] if sub.target_districts else None,
+                        sub.target_states[0] if sub.target_states else None,
+                    ) if p]
+                    return ", ".join(parts) or None
+        return None
+
     async def get_all_active_subscriptions(self) -> List[NotificationSubscription]:
         return [s for s in self._db.values() if s.is_opted_in]
 
@@ -505,6 +529,34 @@ class TestNotificationServices(unittest.TestCase):
             self.assertIn("It will not rain in Chennai today.", res.text)
 
     # 17. Subscriber Verification Tests
+    def test_verify_returns_registered_location_for_gps_less_channels(self):
+        """
+        WhatsApp sends no coordinates, so the assistant had no location at all for those
+        users — and it fabricated one (observed: resolve_location(query="Bengaluru") for
+        a question naming no place). The verify endpoint the sidecar already calls now
+        also returns the district/state the subscriber registered for.
+        """
+        asyncio.run(notification_orchestrator.save_subscription(SubscriptionRequest(
+            user_identifier="sub_loc_user",
+            phone_number="+919812345678",
+            whatsapp_number="+919812345678",
+            enabled_channels=[NotificationChannel.WHATSAPP],
+            target_districts=["Patna"],
+            target_states=["Bihar"],
+            is_opted_in=True,
+        )))
+        res = self.client.get("/api/notifications/subscriber/verify?phone=919812345678")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()["is_subscribed"])
+        self.assertEqual(res.json()["registered_location"], "Patna, Bihar")
+
+    def test_verify_omits_location_for_a_non_subscriber(self):
+        """An unknown number must not leak a location, and must not error."""
+        res = self.client.get("/api/notifications/subscriber/verify?phone=910000000000")
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(res.json()["is_subscribed"])
+        self.assertIsNone(res.json()["registered_location"])
+
     def test_subscriber_verification_endpoint(self):
         # Register a test subscriber
         asyncio.run(notification_orchestrator.save_subscription(SubscriptionRequest(

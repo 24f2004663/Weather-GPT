@@ -131,6 +131,65 @@ class SupabaseClient:
             logger.error(f"Supabase delete_subscription error: {str(e)}")
             return False
 
+    @staticmethod
+    def _row_matches_phone(row: dict, clean_target: str) -> bool:
+        """
+        Whether a subscriber row belongs to this phone number.
+
+        Shared by the auth gate and the location lookup so the two can never disagree
+        about who a number belongs to. Falls back to a last-10-digit comparison because
+        numbers are stored with inconsistent country-code prefixes.
+        """
+        for cp in (row.get("phone_number"), row.get("whatsapp_number"), row.get("user_identifier")):
+            if not cp:
+                continue
+            clean_cp = "".join(c for c in str(cp) if c.isdigit())
+            if clean_cp == clean_target:
+                return True
+            if len(clean_cp) >= 10 and len(clean_target) >= 10 and clean_cp[-10:] == clean_target[-10:]:
+                return True
+        return False
+
+    async def get_registered_location_by_phone(self, phone: str) -> Optional[str]:
+        """
+        The district/state a subscriber registered for alerts, as a display string.
+
+        Channels like WhatsApp cannot send GPS, so without this the assistant has no
+        location at all for those users — and an assistant with a location-shaped tool
+        and no location will invent one. This gives it the place the user actually
+        signed up to be warned about. Returns None when unknown, which is the signal to
+        ask rather than guess.
+        """
+        if not self.has_credentials:
+            return None
+        clean_target = "".join(c for c in phone if c.isdigit())
+        if not clean_target:
+            return None
+
+        endpoint = f"{self.url}/rest/v1/{self._table}"
+        params = {
+            "is_opted_in": "eq.true",
+            "select": "user_identifier,phone_number,whatsapp_number,target_districts,target_states",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.get(endpoint, headers=self._get_headers(), params=params)
+                if res.status_code != 200:
+                    logger.warning(f"Supabase get_registered_location_by_phone HTTP {res.status_code}")
+                    return None
+                for r in res.json():
+                    if not self._row_matches_phone(r, clean_target):
+                        continue
+                    districts = r.get("target_districts") or []
+                    states = r.get("target_states") or []
+                    parts = [p for p in (districts[0] if districts else None,
+                                         states[0] if states else None) if p]
+                    return ", ".join(parts) or None
+                return None
+        except Exception as e:
+            logger.error(f"Supabase get_registered_location_by_phone error: {str(e)}")
+            return None
+
     async def is_phone_subscribed(self, phone: str) -> bool:
         """
         Performs an authoritative live query against Supabase to verify if a phone number
@@ -156,21 +215,7 @@ class SupabaseClient:
                 res = await client.get(endpoint, headers=headers, params=params)
                 if res.status_code == 200:
                     rows = res.json()
-                    for r in rows:
-                        candidate_phones = [
-                            r.get("phone_number"),
-                            r.get("whatsapp_number"),
-                            r.get("user_identifier"),
-                        ]
-                        for cp in candidate_phones:
-                            if not cp:
-                                continue
-                            clean_cp = "".join(c for c in str(cp) if c.isdigit())
-                            if clean_cp == clean_target:
-                                return True
-                            if len(clean_cp) >= 10 and len(clean_target) >= 10 and clean_cp[-10:] == clean_target[-10:]:
-                                return True
-                    return False
+                    return any(self._row_matches_phone(r, clean_target) for r in rows)
                 logger.warning(f"Supabase is_phone_subscribed HTTP {res.status_code}")
                 return False
         except Exception as e:
