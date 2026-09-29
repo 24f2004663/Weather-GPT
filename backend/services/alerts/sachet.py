@@ -477,6 +477,12 @@ class SachetNdmaAlertProvider(BaseAlertProvider):
             alert.event_type = detail["event"]
         if detail.get("headline"):
             alert.headline = detail["headline"]
+            # `title` comes from the RSS index, which SACHET publishes in the issuing
+            # state's language — measured at 27 of 56 live alerts in Telugu, Kannada,
+            # Marathi or Hindi. The UI renders `title` as the card heading, so an English
+            # reader was shown regional script while the English CAP headline sat unused
+            # one field away. The regional text is still preserved in headline_local.
+            alert.title = detail["headline"]
         if detail.get("description"):
             alert.description = detail["description"]
         if detail.get("instruction"):

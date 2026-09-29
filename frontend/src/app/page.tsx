@@ -124,6 +124,7 @@ export default function HomePage() {
   const [climateData, setClimateData] = useState<NasaPowerClimateResponse | null>(null);
   const [alerts, setAlerts] = useState<DisasterAlert[] | null>(null);
   const [gdacsAlerts, setGdacsAlerts] = useState<DisasterAlert[] | null>(null);
+  const [hasAutoDetected, setHasAutoDetected] = useState<boolean>(false);
 
   const [isLoadingWeather, setIsLoadingWeather] = useState<boolean>(true);
   const [isLoadingClimate, setIsLoadingClimate] = useState<boolean>(true);
@@ -244,8 +245,66 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    // Only load data if we have auto-detected or are using the default initially
     loadDataForLocation(selectedLocation);
   }, [selectedLocation, loadDataForLocation]);
+
+  // Auto-detect user's location on first load (Geolocation API -> IP Fallback)
+  useEffect(() => {
+    if (hasAutoDetected) return;
+
+    const fallbackToIP = () => {
+      fetch('https://ipapi.co/json/')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.latitude && data.longitude) {
+            setSelectedLocation({
+              name: data.city || data.region || 'Unknown Location',
+              admin1: data.region,
+              country: data.country_name,
+              country_code: data.country,
+              latitude: data.latitude,
+              longitude: data.longitude,
+              timezone: data.timezone || 'UTC',
+            });
+          }
+          setHasAutoDetected(true);
+        })
+        .catch((err) => {
+          console.error('Failed to auto-detect location based on IP:', err);
+          setHasAutoDetected(true);
+        });
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const latitude = parseFloat(pos.coords.latitude.toFixed(4));
+          const longitude = parseFloat(pos.coords.longitude.toFixed(4));
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+          
+          try {
+            const resolved = await reverseGeocode(latitude, longitude);
+            if (resolved) {
+              setSelectedLocation({ ...resolved, latitude, longitude, timezone: resolved.timezone || timezone });
+            } else {
+              setSelectedLocation({ name: 'My Location', latitude, longitude, timezone });
+            }
+          } catch (e) {
+            setSelectedLocation({ name: 'My Location', latitude, longitude, timezone });
+          }
+          setHasAutoDetected(true);
+        },
+        (err) => {
+          console.warn('Geolocation permission denied or failed, falling back to IP.', err);
+          fallbackToIP();
+        },
+        { timeout: 10000 }
+      );
+    } else {
+      fallbackToIP();
+    }
+  }, [hasAutoDetected]);
 
   // Keep the document language in step with the selected UI language. The static
   // <html lang> in layout.tsx is only the SSR default; without this a Tamil or

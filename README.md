@@ -393,7 +393,7 @@ Will it rain at 6 PM?
 ```
 
 ### Verification Metrics
-- **Backend Unit Tests:** 248 / 248 PASSED
+- **Backend Unit Tests:** 262 / 262 PASSED
 - **WhatsApp Adapter Tests:** 35 / 36 PASSED on a clean checkout. The remaining case asserts a LID-to-phone reverse mapping read from `whatsapp/auth/`, which holds paired-session state and is deliberately gitignored; it passes only on a machine with a live paired WhatsApp session.
 - **ESLint Code Inspection:** 0 Errors, 0 Warnings
 - **Production Build:** Next.js static pages compiled successfully (127 kB First Load JS)

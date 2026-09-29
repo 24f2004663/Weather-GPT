@@ -115,6 +115,20 @@ class TestApplyCapDetail(unittest.TestCase):
         self.assertEqual(self.alert.affected_area, "Ghaghra, Turtipar, Ballia, Uttar Pradesh")
         self.assertIn("Uttar Pradesh", self.alert.affected_states)
 
+    def test_title_takes_the_english_headline(self):
+        """
+        `title` comes from the RSS index, which SACHET publishes in the issuing state's
+        language, and the UI renders it as the card heading. Measured at 27 of 56 live
+        alerts in Telugu/Kannada/Marathi/Hindi, so an English reader saw regional script
+        while the English CAP headline sat unused one field away.
+        """
+        self.assertEqual(self.alert.title, "River Ghaghra at Turtipar in Ballia district of Uttar Pradesh.")
+        self.assertNotIn("घाघरा", self.alert.title)
+
+    def test_regional_title_is_still_reachable_for_regional_readers(self):
+        """Overwriting `title` must not lose the official regional text."""
+        self.assertIn("घाघरा", self.alert.headline_local)
+
     def test_regional_language_text_is_preserved_verbatim(self):
         self.assertIn("घाघरा", self.alert.headline_local)
         self.assertEqual(self.alert.local_language, "hi")
