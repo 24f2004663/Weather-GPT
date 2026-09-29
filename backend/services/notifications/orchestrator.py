@@ -115,6 +115,12 @@ class NotificationOrchestrator:
             return False
         return await supabase_client.is_phone_subscribed(phone)
 
+    async def get_registered_location(self, phone: str) -> Optional[str]:
+        """The district/state this subscriber registered for, for channels without GPS."""
+        if not supabase_client.is_configured():
+            return None
+        return await supabase_client.get_registered_location_by_phone(phone)
+
     async def handle_alert_event(self, event: DisasterAlertTriggeredEvent) -> List[NotificationRecord]:
         """
         Orchestrates concurrent, fault-isolated multi-channel delivery when an official disaster alert occurs.
