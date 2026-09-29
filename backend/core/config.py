@@ -54,8 +54,11 @@ class Settings(BaseSettings):
     SACHET_NDMA_ALERT_FEED_URL: str = Field(default="https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml", env="SACHET_NDMA_ALERT_FEED_URL")
 
     # Reverse geocoding (coordinates -> place name). Open-Meteo's geocoding API is
-    # forward-only, so this uses Nominatim, whose usage policy requires a descriptive
-    # User-Agent and roughly one request per second — hence the long cache TTL.
+    # forward-only, so this needs a separate provider.
+    # BigDataCloud leads: keyless, built for per-user volume, and it answers from
+    # datacenter IPs. Nominatim forbids bulk/datacenter use and returned nothing to the
+    # deployed host, so it is only a fallback for environments where it does work.
+    BIGDATACLOUD_REVERSE_URL: str = Field(default="https://api.bigdatacloud.net/data/reverse-geocode-client", env="BIGDATACLOUD_REVERSE_URL")
     NOMINATIM_REVERSE_URL: str = Field(default="https://nominatim.openstreetmap.org/reverse", env="NOMINATIM_REVERSE_URL")
     REVERSE_GEOCODE_USER_AGENT: str = Field(
         default="WeatherGPT/0.7 (SIH26068 disaster alert prototype)",
@@ -63,6 +66,9 @@ class Settings(BaseSettings):
     )
     REVERSE_GEOCODE_TIMEOUT_SECONDS: float = Field(default=8.0, env="REVERSE_GEOCODE_TIMEOUT_SECONDS")
     REVERSE_GEOCODE_CACHE_TTL_SECONDS: int = Field(default=604800, env="REVERSE_GEOCODE_CACHE_TTL_SECONDS")  # 7 days
+    # A provider answering "nowhere is here" is a real answer, but a cheap one to
+    # re-check, so it expires quickly. Provider *failures* are never cached at all.
+    REVERSE_GEOCODE_EMPTY_CACHE_TTL_SECONDS: int = Field(default=900, env="REVERSE_GEOCODE_EMPTY_CACHE_TTL_SECONDS")  # 15 min
 
     # Numerical Weather Prediction model selection. Open-Meteo blends several NWP
     # sources under "best_match"; naming a model pins the forecast to that single

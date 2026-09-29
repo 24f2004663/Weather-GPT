@@ -3,15 +3,18 @@ Reverse geocoding: coordinates -> a human place name.
 
 Open-Meteo's geocoding API is forward-only (it has no /reverse endpoint), so a device
 position previously had nowhere to resolve to and the UI fell back to the literal string
-"My Location". That is also why a GPS-located user got weaker disaster-alert targeting:
-without admin1/admin2 there is no state or district to match an alert against.
+"My Location". That also weakened disaster-alert targeting for GPS-located users: without
+admin1/admin2 there is no state or district to match an alert against.
 
-This runs server-side rather than in the browser for two reasons: Nominatim requires a
-descriptive User-Agent, which a browser will not let a page set, and its usage policy
-caps requests at roughly one per second, which is only enforceable behind a shared cache.
+Provider order matters here. Nominatim is the obvious OSM choice and works fine from a
+residential IP, but its usage policy forbids bulk/datacenter use and it returns nothing to
+our deployed host — every lookup from production came back empty while the same lookup
+from a laptop succeeded. BigDataCloud's reverse-geocode-client endpoint is keyless, built
+for per-user volume, and answers from datacenter IPs, so it leads; Nominatim stays as a
+fallback for environments where it does work.
 """
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import httpx
 
@@ -22,7 +25,7 @@ from backend.core.http_client import http_client_manager
 from backend.schemas.location import LocationResult
 
 # Administrative suffixes that are correct in a database but wrong on a weather card:
-# Nominatim returns "Chennai Corporation" and "Mundwa Tehsil" where a person says
+# providers return "Chennai Corporation" and "Mundwa Tehsil" where a person says
 # "Chennai" and "Mundwa".
 _ADMIN_SUFFIXES = re.compile(
     r"\s+(Municipal\s+Corporation|Corporation|Municipality|Municipal\s+Council|"
@@ -38,45 +41,108 @@ def _clean_place_name(name: str) -> str:
 
 
 class ReverseGeocodeProvider:
-    def __init__(self, base_url: Optional[str] = None, timeout: Optional[float] = None):
-        self.base_url = base_url or settings.NOMINATIM_REVERSE_URL
+    def __init__(self, timeout: Optional[float] = None):
         self.timeout = timeout or settings.REVERSE_GEOCODE_TIMEOUT_SECONDS
 
     @staticmethod
     def _cache_key(lat: float, lon: float) -> str:
-        # ~1.1 km buckets. Finer precision would just miss the cache for every small
-        # GPS jitter while returning the same place name.
+        # ~1.1 km buckets. Finer precision would just miss the cache on GPS jitter while
+        # returning the same place name.
         return f"revgeo:{round(lat, 2):.2f}:{round(lon, 2):.2f}"
 
-    def normalize(self, payload: Dict[str, Any], lat: float, lon: float) -> Optional[LocationResult]:
-        """Maps a Nominatim response onto LocationResult, or None if it names nowhere."""
-        address = payload.get("address") or {}
-
-        raw_name = (
-            address.get("city")
-            or address.get("town")
-            or address.get("village")
-            or address.get("municipality")
-            or address.get("suburb")
-            or address.get("county")
-            or address.get("state_district")
-            or payload.get("name")
-        )
-        if not raw_name:
-            # Open ocean, or a point Nominatim cannot place. Better to keep the caller's
-            # fallback than to invent a name.
+    # ------------------------------------------------------------------
+    # Providers. Each returns (location, provider_answered).
+    #
+    # The second value separates "the provider replied and this point has no name"
+    # from "the provider did not reply". Only the former is a fact worth caching.
+    # ------------------------------------------------------------------
+    def _normalize_bigdatacloud(self, p: Dict[str, Any], lat: float, lon: float) -> Optional[LocationResult]:
+        raw = p.get("city") or p.get("locality") or p.get("principalSubdivision")
+        if not raw:
             return None
-
-        country_code = address.get("country_code")
+        code = p.get("countryCode")
         return LocationResult(
-            name=_clean_place_name(str(raw_name)),
+            name=_clean_place_name(str(raw)),
             latitude=lat,
             longitude=lon,
-            country=address.get("country"),
-            country_code=country_code.upper() if country_code else None,
-            admin1=address.get("state") or address.get("region"),
-            admin2=address.get("state_district") or address.get("county"),
+            country=p.get("countryName") or None,
+            country_code=code.upper() if code else None,
+            admin1=p.get("principalSubdivision") or None,
+            admin2=self._bdc_admin2(p),
         )
+
+    @staticmethod
+    def _bdc_admin2(p: Dict[str, Any]) -> Optional[str]:
+        """Most specific administrative level BigDataCloud reports, if any.
+
+        Over open water `administrative` comes back as an empty list, so this cannot
+        index blindly -- doing so raised IndexError and turned an unnameable point into
+        a 500 instead of a clean null.
+        """
+        info = p.get("localityInfo")
+        if not isinstance(info, dict):
+            return None
+        levels = info.get("administrative")
+        if not isinstance(levels, list) or not levels:
+            return None
+        last = levels[-1]
+        return last.get("name") if isinstance(last, dict) else None
+
+    def _normalize_nominatim(self, p: Dict[str, Any], lat: float, lon: float) -> Optional[LocationResult]:
+        a = p.get("address") or {}
+        raw = (
+            a.get("city") or a.get("town") or a.get("village") or a.get("municipality")
+            or a.get("suburb") or a.get("county") or a.get("state_district") or p.get("name")
+        )
+        if not raw:
+            return None
+        code = a.get("country_code")
+        return LocationResult(
+            name=_clean_place_name(str(raw)),
+            latitude=lat,
+            longitude=lon,
+            country=a.get("country"),
+            country_code=code.upper() if code else None,
+            admin1=a.get("state") or a.get("region"),
+            admin2=a.get("state_district") or a.get("county"),
+        )
+
+    async def _fetch(self, url: str, params: Dict[str, Any], headers: Dict[str, str]) -> Optional[Dict[str, Any]]:
+        try:
+            client = await http_client_manager.get_client()
+            response = await client.get(
+                url, params=params, headers=headers, timeout=self.timeout, follow_redirects=True
+            )
+        except Exception as e:
+            logger.warning(f"[Reverse geocode] {url} unreachable: {e}")
+            return None
+        if response.status_code != 200:
+            logger.warning(f"[Reverse geocode] {url} HTTP {response.status_code}")
+            return None
+        try:
+            return response.json()
+        except Exception:
+            logger.warning(f"[Reverse geocode] {url} returned malformed JSON")
+            return None
+
+    async def _try_providers(self, lat: float, lon: float) -> Tuple[Optional[LocationResult], bool]:
+        payload = await self._fetch(
+            settings.BIGDATACLOUD_REVERSE_URL,
+            {"latitude": lat, "longitude": lon, "localityLanguage": "en"},
+            {"Accept": "application/json"},
+        )
+        if payload is not None:
+            return self._normalize_bigdatacloud(payload, lat, lon), True
+
+        payload = await self._fetch(
+            settings.NOMINATIM_REVERSE_URL,
+            {"format": "jsonv2", "lat": lat, "lon": lon, "zoom": 10, "addressdetails": 1},
+            {"User-Agent": settings.REVERSE_GEOCODE_USER_AGENT},
+        )
+        if payload is not None:
+            return self._normalize_nominatim(payload, lat, lon), True
+
+        return None, False
 
     async def reverse(self, lat: float, lon: float) -> Optional[LocationResult]:
         key = self._cache_key(lat, lon)
@@ -85,45 +151,25 @@ class ReverseGeocodeProvider:
             logger.debug(f"[Cache HIT] reverse geocode ({lat:.2f},{lon:.2f})")
             return LocationResult(**cached) if cached else None
 
-        params = {
-            "format": "jsonv2",
-            "lat": lat,
-            "lon": lon,
-            "zoom": 10,          # settlement level: city/town/village rather than a street
-            "addressdetails": 1,
-        }
-        headers = {"User-Agent": settings.REVERSE_GEOCODE_USER_AGENT}
+        resolved, answered = await self._try_providers(lat, lon)
 
-        try:
-            client = await http_client_manager.get_client()
-            response = await client.get(
-                self.base_url, params=params, headers=headers, timeout=self.timeout
-            )
-        except httpx.TimeoutException:
-            logger.warning(f"[Reverse geocode timeout] ({lat:.2f},{lon:.2f})")
-            return None
-        except Exception as e:
-            logger.warning(f"[Reverse geocode error] ({lat:.2f},{lon:.2f}): {e}")
+        if not answered:
+            # Every provider failed. Returning None is right for this request, but caching
+            # it is not: a transient outage or a rate-limit would otherwise pin this
+            # coordinate to "unnameable" for the whole TTL. Retry on the next request.
+            logger.warning(f"[Reverse geocode] all providers failed for ({lat:.2f},{lon:.2f}); not caching")
             return None
 
-        if response.status_code != 200:
-            logger.warning(f"[Reverse geocode HTTP {response.status_code}] ({lat:.2f},{lon:.2f})")
-            return None
-
-        try:
-            payload = response.json()
-        except Exception:
-            logger.warning(f"[Reverse geocode malformed JSON] ({lat:.2f},{lon:.2f})")
-            return None
-
-        resolved = self.normalize(payload, lat, lon)
-
-        # Place names do not move, so this is cached for a long time. A negative result is
-        # cached too, so an ocean tap does not re-hit the provider on every page load.
+        # A provider answered. Place names do not move, so a hit is cached for a long
+        # time; a genuine "nowhere" (open ocean) is cached briefly, since it is a real
+        # answer but a cheap one to re-check.
         await cache.set(
             key,
             resolved.dict() if resolved else None,
-            ttl_seconds=settings.REVERSE_GEOCODE_CACHE_TTL_SECONDS,
+            ttl_seconds=(
+                settings.REVERSE_GEOCODE_CACHE_TTL_SECONDS if resolved
+                else settings.REVERSE_GEOCODE_EMPTY_CACHE_TTL_SECONDS
+            ),
         )
         return resolved
 
