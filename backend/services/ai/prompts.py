@@ -105,6 +105,16 @@ SUPPORTED_OUTPUT_LANGUAGES: dict = {
 
 DEFAULT_OUTPUT_LANGUAGE = "en"
 
+_ENGLISH_DIRECTIVE = """
+
+Output Language Requirement:
+The user has selected English as their interface language. Write your ENTIRE response in English.
+- Keep numeric values, units (°C, km/h, mm, %) and times in standard numeric form.
+- Where a place has a common local name, you may give it once with the English name in parentheses.
+- Do NOT translate official SACHET/NDMA emergency instructions. Reproduce official warning text exactly as issued by the agency; if only a regional-language version exists, quote it as issued and summarise it in English alongside.
+- This applies even when the user writes to you in another language: answer in English.
+"""
+
 _LANGUAGE_DIRECTIVE_TEMPLATE = """
 
 Output Language Requirement:
@@ -115,14 +125,6 @@ The user has selected {language} as their interface language. Write your ENTIRE 
 - Do NOT translate official SACHET/NDMA emergency instructions. Reproduce official warning text exactly as issued by the agency; where an official version in {language} was supplied by the tools, use that official version verbatim rather than translating the English one.
 - This language requirement applies even when the user writes to you in a different language.
 """
-
-_MIRROR_DIRECTIVE = """
-
-Output Language Requirement:
-Reply in the same language the user wrote their message in. If they write in Hindi, answer in Hindi; in Tamil, answer in Tamil; in Hinglish (Hindi in Latin script), answer in Hinglish. Keep numeric values, units and times in standard numeric form.
-Do NOT translate official SACHET/NDMA emergency instructions -- reproduce official warning text exactly as issued.
-"""
-
 
 def normalize_language(language_preference: Optional[str]) -> str:
     """Maps a client-supplied language hint onto a supported code, defaulting to English."""
@@ -136,14 +138,16 @@ def build_system_instruction(language_preference: Optional[str] = None) -> str:
     """
     Returns the system instruction with an explicit output-language directive appended.
 
-    English is the default the UI ships with, so an 'en' preference is treated as
-    "unset" and the assistant mirrors the language the user actually wrote in --
-    otherwise a Hindi question from a user who never touched the selector would be
-    answered in English. Any other selection is an explicit choice and governs.
+    Every supported language, English included, is treated the same way: the selector
+    governs the reply, whatever language the question was typed in. English used to be
+    special-cased into "mirror the user's input language" on the theory that 'en' meant
+    "unset" -- but the picker is visible and shows English, so it is a choice like any
+    other, and the mirror rule meant a Hinglish phrase or an Indian place name could flip
+    an English reader into a regional-language answer.
     """
     code = normalize_language(language_preference)
     if code == DEFAULT_OUTPUT_LANGUAGE:
-        return SYSTEM_INSTRUCTION + _MIRROR_DIRECTIVE
+        return SYSTEM_INSTRUCTION + _ENGLISH_DIRECTIVE
     return SYSTEM_INSTRUCTION + _LANGUAGE_DIRECTIVE_TEMPLATE.format(
         language=SUPPORTED_OUTPUT_LANGUAGES[code]
     )

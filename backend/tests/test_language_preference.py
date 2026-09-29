@@ -57,23 +57,29 @@ class TestBuildSystemInstruction(unittest.TestCase):
             build_system_instruction("bn"),
         )
 
-    def test_english_default_mirrors_the_user_language(self):
+    def test_english_selection_forces_english(self):
         """
-        'en' is the shipped default, so it means "unset" rather than "force English" --
-        a Hindi question from a user who never touched the selector must not be
-        answered in English.
+        English is a choice like any other. It used to be special-cased into "mirror the
+        user's input language", which meant a Hinglish phrase or an Indian place name
+        could flip an English reader into a regional-language answer.
         """
         instruction = build_system_instruction("en")
-        self.assertIn("same language the user wrote", instruction)
-        self.assertNotIn("Write your ENTIRE response in", instruction)
+        self.assertIn("Write your ENTIRE response in English", instruction)
+        self.assertIn("answer in English", instruction)
+        self.assertNotIn("same language the user wrote", instruction)
+
+    def test_english_directive_is_not_self_contradictory(self):
+        """The parameterised template renders "must all be in English. Do not leave them
+        in English." when the target IS English, so English has its own wording."""
+        instruction = build_system_instruction("en")
+        self.assertNotIn("Do not leave them in English", instruction)
 
     def test_every_supported_language_produces_a_directive(self):
         for code, name in SUPPORTED_OUTPUT_LANGUAGES.items():
             with self.subTest(code=code):
                 instruction = build_system_instruction(code)
-                if code == "en":
-                    self.assertIn("same language the user wrote", instruction)
-                else:
+                self.assertIn("Write your ENTIRE response in", instruction)
+                if code != "en":
                     self.assertIn(name, instruction)
 
     def test_official_alert_text_is_protected_from_translation(self):
@@ -130,10 +136,10 @@ class TestLanguageReachesTheModelRequest(unittest.IsolatedAsyncioTestCase):
         instruction = body["systemInstruction"]["parts"][0]["text"]
         self.assertIn("Hindi", instruction)
 
-    async def test_default_request_carries_the_mirror_directive(self):
+    async def test_default_request_forces_english(self):
         body = await self._capture_body("en")
         instruction = body["systemInstruction"]["parts"][0]["text"]
-        self.assertIn("same language the user wrote", instruction)
+        self.assertIn("Write your ENTIRE response in English", instruction)
 
 
 if __name__ == "__main__":
