@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { LocationResult } from '../types';
 import { API_BASE_URL, sendTestNotification } from '../lib/api';
 import { t } from '../lib/translations';
+import { Siren, X, FlaskConical } from 'lucide-react';
 
 interface NotificationSettingsModalProps {
   isOpen: boolean;
@@ -236,44 +237,53 @@ export default function NotificationSettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 relative max-h-[92vh] overflow-y-auto">
+    // The modal sits on its own dark scrim in both themes, so it pins the dark tokens
+    // rather than inheriting the page's ink, which would be unreadable here.
+    <div data-surface="dark" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-2xl flex items-center justify-center p-4">
+      <div className="bg-black/40 backdrop-blur-2xl border border-white/20 w-full max-w-3xl rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 relative max-h-[92vh] overflow-y-auto">
         {/* Modal Header */}
-        <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-start justify-between border-b border-white/20 pb-4">
           <div className="flex items-center space-x-3">
             <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-xl text-white shadow-lg shadow-rose-500/20">
-              🚨
+              <Siren size={22} strokeWidth={2} aria-hidden="true" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white">{t('emergencyAlertPreferences', currentLanguage)}</h3>
-              <p className="text-xs text-slate-400">{t('modalSubtitle', currentLanguage)}</p>
+              <p className="text-xs text-white/70">{t('modalSubtitle', currentLanguage)}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white text-xl font-bold p-1 transition-colors"
+            className="text-white/70 hover:text-white text-xl font-bold p-1 transition-colors"
           >
-            ✕
+            <X size={16} strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
 
         {statusMessage && (
           <div className="p-3.5 bg-sky-950/80 border border-sky-800 rounded-xl text-xs text-sky-200 flex items-center justify-between shadow-md">
             <span>{statusMessage}</span>
-            <button type="button" onClick={() => setStatusMessage(null)} className="text-sky-400 font-bold ml-2">✕</button>
+            <button
+              type="button"
+              onClick={() => setStatusMessage(null)}
+              aria-label={t('dismiss', currentLanguage)}
+              className="text-sky-400 ml-2 shrink-0"
+            >
+              <X size={14} strokeWidth={2.5} aria-hidden="true" />
+            </button>
           </div>
         )}
 
         {/* Subscription Status Banner */}
-        <div className="flex flex-wrap items-center justify-between p-4 bg-slate-950/90 rounded-2xl border border-slate-800 gap-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between p-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 gap-3 text-xs">
           <div className="flex items-center space-x-2.5">
             <span className={`h-3.5 w-3.5 rounded-full ${isSubscribed ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
             <div>
               <span className="font-bold text-white">
                 {t('statusLabel', currentLanguage)} {isSubscribed ? t('optedInActive', currentLanguage) : t('notSubscribed', currentLanguage)}
               </span>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-white/70">
                 {t('authoritativePersistence', currentLanguage)}
               </p>
             </div>
@@ -287,38 +297,38 @@ export default function NotificationSettingsModal({
         <div className="space-y-6 text-xs">
           {/* Phone Number */}
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-200 text-sm">{t('mobileWhatsAppNumber', currentLanguage)}</label>
+            <label className="font-bold text-white/90 text-sm">{t('mobileWhatsAppNumber', currentLanguage)}</label>
             <input
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="+91 98765 43210"
-              className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none"
+              className="w-full bg-white/5 border border-white/20 focus:border-white/40 rounded-xl px-4 py-3 text-sm text-white placeholder-white/50 focus:outline-none backdrop-blur-md"
             />
-            <p className="text-[11px] text-slate-500">{t('e164FormatHint', currentLanguage)}</p>
+            <p className="text-[11px] text-white/50">{t('e164FormatHint', currentLanguage)}</p>
           </div>
 
           {/* Delivery Channels Grid with Test Buttons */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="font-bold text-slate-200 text-sm">{t('emergencyChannels', currentLanguage)}</label>
-              <span className="text-[11px] text-slate-400">{t('testButtonsNotice', currentLanguage)}</span>
+              <label className="font-bold text-white/90 text-sm">{t('emergencyChannels', currentLanguage)}</label>
+              <span className="text-[11px] text-white/70">{t('testButtonsNotice', currentLanguage)}</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* WhatsApp */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all space-y-3">
+              <div className="p-4 rounded-2xl glass-inset hover:border-white/20 transition-colors space-y-3">
                 <label className="flex items-start justify-between cursor-pointer">
                   <div className="flex items-center space-x-2.5">
                     <input
                       type="checkbox"
                       checked={channels.whatsapp}
                       onChange={(e) => setChannels({ ...channels, whatsapp: e.target.checked })}
-                      className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
+                      className="rounded text-sky-500 focus:ring-0 bg-black/40 border-white/20 mt-0.5"
                     />
                     <div>
                       <div className="font-bold text-white text-sm">{t('channelWhatsApp', currentLanguage)}</div>
-                      <div className="text-[11px] text-slate-400">Live Baileys / Twilio ({providerStatus['WHATSAPP'] || 'ACTIVE'})</div>
+                      <div className="text-[11px] text-white/70">Live Baileys / Twilio ({providerStatus['WHATSAPP'] || 'ACTIVE'})</div>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
@@ -327,7 +337,7 @@ export default function NotificationSettingsModal({
                 </label>
 
                 {channels.whatsapp && isSubscribed && (
-                  <div className="pt-2 border-t border-slate-900 space-y-2">
+                  <div className="pt-2 border-t border-white/10 space-y-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -337,7 +347,7 @@ export default function NotificationSettingsModal({
                       disabled={testState['WHATSAPP']?.loading}
                       className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
                     >
-                      <span>🧪</span>
+                      <FlaskConical size={12} strokeWidth={2} aria-hidden="true" />
                       <span>{testState['WHATSAPP']?.loading ? t('openingWhatsApp', currentLanguage) : t('testWhatsApp', currentLanguage)}</span>
                     </button>
                     {testState['WHATSAPP']?.message && (
@@ -350,18 +360,18 @@ export default function NotificationSettingsModal({
               </div>
 
               {/* Web Push */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all space-y-3">
+              <div className="p-4 rounded-2xl glass-inset hover:border-white/20 transition-colors space-y-3">
                 <label className="flex items-start justify-between cursor-pointer">
                   <div className="flex items-center space-x-2.5">
                     <input
                       type="checkbox"
                       checked={channels.web_push}
                       onChange={(e) => setChannels({ ...channels, web_push: e.target.checked })}
-                      className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
+                      className="rounded text-sky-500 focus:ring-0 bg-black/40 border-white/20 mt-0.5"
                     />
                     <div>
                       <div className="font-bold text-white text-sm">{t('channelWebPush', currentLanguage)}</div>
-                      <div className="text-[11px] text-slate-400">Browser VAPID ({providerStatus['WEB_PUSH'] || 'ACTIVE'})</div>
+                      <div className="text-[11px] text-white/70">Browser VAPID ({providerStatus['WEB_PUSH'] || 'ACTIVE'})</div>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
@@ -370,14 +380,14 @@ export default function NotificationSettingsModal({
                 </label>
 
                 {channels.web_push && isSubscribed && (
-                  <div className="pt-2 border-t border-slate-900 space-y-2">
+                  <div className="pt-2 border-t border-white/10 space-y-2">
                     <button
                       type="button"
                       onClick={() => handleRunChannelTest('WEB_PUSH')}
                       disabled={testState['WEB_PUSH']?.loading}
                       className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
                     >
-                      <span>🧪</span>
+                      <FlaskConical size={12} strokeWidth={2} aria-hidden="true" />
                       <span>{testState['WEB_PUSH']?.loading ? t('sendingTest', currentLanguage) : t('testWebPush', currentLanguage)}</span>
                     </button>
                     {testState['WEB_PUSH']?.message && (
@@ -390,18 +400,18 @@ export default function NotificationSettingsModal({
               </div>
 
               {/* SMS Alerts (Phase 2 Active) */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-all space-y-3">
+              <div className="p-4 rounded-2xl glass-inset hover:border-white/20 transition-colors space-y-3">
                 <label className="flex items-start justify-between cursor-pointer">
                   <div className="flex items-center space-x-2.5">
                     <input
                       type="checkbox"
                       checked={channels.sms}
                       onChange={(e) => setChannels({ ...channels, sms: e.target.checked })}
-                      className="rounded text-sky-500 focus:ring-0 bg-slate-900 border-slate-700 mt-0.5"
+                      className="rounded text-sky-500 focus:ring-0 bg-black/40 border-white/20 mt-0.5"
                     />
                     <div>
                       <div className="font-bold text-white text-sm">{t('channelSMS', currentLanguage)}</div>
-                      <div className="text-[11px] text-slate-400">TextBee Android SIM Gateway ({providerStatus['SMS'] || 'ACTIVE'})</div>
+                      <div className="text-[11px] text-white/70">TextBee Android SIM Gateway ({providerStatus['SMS'] || 'ACTIVE'})</div>
                     </div>
                   </div>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
@@ -410,14 +420,14 @@ export default function NotificationSettingsModal({
                 </label>
 
                 {channels.sms && isSubscribed && (
-                  <div className="pt-2 border-t border-slate-900 space-y-2">
+                  <div className="pt-2 border-t border-white/10 space-y-2">
                     <button
                       type="button"
                       onClick={() => handleRunChannelTest('SMS')}
                       disabled={testState['SMS']?.loading}
                       className="px-3.5 py-1.5 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-300 font-bold text-xs border border-sky-800 transition-colors w-full flex items-center justify-center space-x-2"
                     >
-                      <span>🧪</span>
+                      <FlaskConical size={12} strokeWidth={2} aria-hidden="true" />
                       <span>{testState['SMS']?.loading ? t('sendingTest', currentLanguage) : t('testSMS', currentLanguage)}</span>
                     </button>
                     {testState['SMS']?.message && (
@@ -430,16 +440,16 @@ export default function NotificationSettingsModal({
               </div>
 
               {/* Voice / IVR Call (Phase 3 — Disabled) */}
-              <div className="p-4 rounded-2xl bg-slate-950/50 border border-slate-800/60 opacity-50 space-y-2">
+              <div className="p-4 rounded-2xl glass-inset opacity-50 space-y-2">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-2.5">
-                    <input type="checkbox" disabled checked={false} className="rounded bg-slate-900 border-slate-800 cursor-not-allowed" />
+                    <input type="checkbox" disabled checked={false} className="rounded bg-black/40 border-white/20 cursor-not-allowed" />
                     <div>
-                      <div className="font-bold text-slate-400 text-sm">{t('channelVoice', currentLanguage)}</div>
-                      <div className="text-[10px] text-slate-500">{t('criticalWarningsCall', currentLanguage)}</div>
+                      <div className="font-bold text-white/70 text-sm">{t('channelVoice', currentLanguage)}</div>
+                      <div className="text-[10px] text-white/50">{t('criticalWarningsCall', currentLanguage)}</div>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-900 text-slate-500 border border-slate-800">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-black/40 text-white/50 border border-white/10">
                     {t('phase3Disabled', currentLanguage)}
                   </span>
                 </div>
@@ -449,11 +459,11 @@ export default function NotificationSettingsModal({
 
           {/* Minimum Severity Threshold */}
           <div className="space-y-1.5">
-            <label className="font-bold text-slate-200 text-sm">{t('minSeverityFilter', currentLanguage)}</label>
+            <label className="font-bold text-white/90 text-sm">{t('minSeverityFilter', currentLanguage)}</label>
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value as any)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none cursor-pointer"
+              className="w-full bg-black/40 backdrop-blur-md border border-white/20 rounded-xl px-4 py-3 text-sm text-white focus:outline-none cursor-pointer"
             >
               <option value="Severe">{t('severeAndExtreme', currentLanguage)}</option>
               <option value="Extreme">{t('extremeOnly', currentLanguage)}</option>
@@ -461,16 +471,16 @@ export default function NotificationSettingsModal({
           </div>
 
           {/* Target Region */}
-          <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-1">
-            <div className="font-bold text-slate-300 text-xs">{t('geographicScope', currentLanguage)}</div>
-            <div className="text-slate-400 font-mono text-[11px]">
+          <div className="p-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 space-y-1">
+            <div className="font-bold text-white/80 text-xs">{t('geographicScope', currentLanguage)}</div>
+            <div className="text-white/70 font-mono text-[11px]">
               {selectedLocation ? `${selectedLocation.name}, ${selectedLocation.admin1 || selectedLocation.country}` : t('nationalCoverage', currentLanguage)}
             </div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/20">
           {isSubscribed ? (
             <button
               type="button"
@@ -486,7 +496,7 @@ export default function NotificationSettingsModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition-colors"
+              className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-md text-white/80 font-medium text-xs transition-colors"
             >
               {t('cancel', currentLanguage)}
             </button>
@@ -494,14 +504,14 @@ export default function NotificationSettingsModal({
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-all shadow-lg shadow-sky-600/20"
+              className="px-6 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-[#fff] font-bold text-xs transition-all shadow-lg shadow-sky-600/20"
             >
               {isSaving ? t('saving', currentLanguage) : t('saveAndOptIn', currentLanguage)}
             </button>
           </div>
         </div>
 
-        <p className="text-[10px] text-slate-500 leading-relaxed font-mono">
+        <p className="text-[10px] text-white/50 leading-relaxed font-mono">
           {t('consentNotice', currentLanguage)}
         </p>
       </div>

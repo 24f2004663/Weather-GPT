@@ -56,20 +56,28 @@ The project is structured as an event-driven monorepo separating real-time data 
 - Implements strict severity classification: Extreme, Severe, Moderate, Minor, and Unknown.
 - Resolves geographic boundaries down to State and District levels, enforcing exact country matching to eliminate false-positive geographic assignments.
 - Uses automated batch deduplication and expiration filtering to ignore stale or cancelled disaster bulletins.
+- Follows each RSS item through to its full CAP 1.2 document to recover severity, urgency, certainty, expiry, official public-safety instructions and a structured `areaDesc`; the RSS index alone carries none of these.
+- Preserves the official regional-language `<cap:info>` block verbatim (`headline_local` / `description_local`), so emergency instructions are never machine-translated.
 
-### 2. Multi-Model Gemini AI Router with Zero-Cost Quota Management
+### 2. Selectable Numerical Weather Prediction Models
+- Forecasts default to Open-Meteo's `best_match` multi-model blend, and can be pinned to a single named global NWP system via the `model` query parameter.
+- Supported systems: GFS (NOAA NCEP), ICON (DWD), ECMWF IFS, GEM (Environment Canada), JMA GSM/MSM, and the UKMO Unified Model. `GET /api/weather/models` enumerates them with their issuing centres.
+- Every response carries a `weather_model` field, so a forecast is always attributable to the system that produced it.
+- Model identity is part of the forecast cache key, preventing one model's output from being served under another model's name.
+
+### 3. Multi-Model Gemini AI Router with Zero-Cost Quota Management
 - Features a multi-tiered LLM router that manages rate-limits and token quotas across Google Gemini models (Gemini 3.5 Flash-Lite, Gemini 3.1 Flash-Lite, Gemma 4 31B, Gemma 4 26B).
 - Automatically tracks Requests Per Minute (RPM), Requests Per Day (RPD), and Tokens Per Minute (TPM).
 - Implements 60-second quota suppression and silent fallbacks to ensure continuous availability during high-traffic emergency events.
 - Executes server-side tool calling for geocoding, current weather, multi-day forecasts, 30-year historical climate tables, and active disaster alerts.
 
-### 3. Hyper-Local Multi-Channel Emergency Dispatch Engine
+### 4. Hyper-Local Multi-Channel Emergency Dispatch Engine
 - **SMS Channel (TextBee Gateway):** Integrates with an Android gateway device running the TextBee service to dispatch real emergency SMS messages to registered mobile numbers without external carrier fees.
 - **WhatsApp Channel (Baileys Open-Source Sidecar):** Built on `@whiskeysockets/baileys` Node.js socket layer. Runs as an independent process with live Supabase authorization checks, processing incoming conversational queries and sending outbound alert dispatches.
 - **Web Push Channel (Native VAPID Protocol):** Implements RFC 8291/8292 Web Push VAPID protocol using `pywebpush` on the backend and an active Service Worker (`public/sw.js`) on the frontend for browser-native push notifications.
 - **Voice/IVR Channel:** Generates structured bilingual (English and Hindi) spoken alert scripts formatted with emergency instructions, affected areas, and official source attributions.
 
-### 4. Deterministic Deduplication and One-Shot Delivery Guards
+### 5. Deterministic Deduplication and One-Shot Delivery Guards
 - Enforces strict alert deduplication via `public.seen_alerts` and 15-second idempotency debounce keys (`test:{user_id}:{channel}`) to eliminate duplicate notification sends.
 - Prevents double-click request repetition on frontend user interfaces.
 - Applies strict per-recipient rate limits (maximum 5 notifications per hour).
@@ -87,8 +95,9 @@ The project is structured as an event-driven monorepo separating real-time data 
 
 ### Frontend Application
 - **Framework:** Next.js 14 (App Router), React 18, TypeScript
-- **Styling & Components:** Tailwind CSS, Lucide Icons, Headless UI
-- **Geospatial & Visualizations:** Leaflet OpenStreetMap, Recharts climate charts
+- **Styling & Components:** Tailwind CSS, Lucide Icons (`clsx` and `tailwind-merge` are declared but not currently imported)
+- **Progressive Web App:** Installable via `public/manifest.json` with maskable icons and a notification badge
+- **Geospatial & Visualizations:** Embedded OpenStreetMap viewport, hand-rolled inline-SVG charts (no external charting dependency)
 - **Service Worker:** Native Web Push Service Worker (`frontend/public/sw.js`)
 
 ### WhatsApp Sidecar
@@ -125,10 +134,10 @@ npm run build
 ```
 
 ### Verification Metrics
-- **Backend Unit Tests:** 181 / 181 PASSED
-- **WhatsApp Adapter Tests:** 36 / 36 PASSED
+- **Backend Unit Tests:** 248 / 248 PASSED
+- **WhatsApp Adapter Tests:** 35 / 36 PASSED on a clean checkout. The remaining case asserts a LID-to-phone reverse mapping read from `whatsapp/auth/`, which holds paired-session state and is deliberately gitignored; it passes only on a machine with a live paired WhatsApp session.
 - **ESLint Code Inspection:** 0 Errors, 0 Warnings
-- **Production Build:** Next.js static pages compiled successfully
+- **Production Build:** Next.js static pages compiled successfully (127 kB First Load JS)
 
 ---
 
@@ -138,8 +147,9 @@ npm run build
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/health` | System diagnostics and service readiness status | None |
 | `GET` | `/api/weather/current` | Real-time weather observations for coordinates | `lat` (float), `lon` (float) |
-| `GET` | `/api/weather/forecast` | Multi-day daily and hourly forecast | `lat` (float), `lon` (float), `days` (int) |
-| `GET` | `/api/weather/by-city` | Unified city search and weather forecast | `city` (string), `days` (int) |
+| `GET` | `/api/weather/forecast` | Multi-day daily and hourly forecast | `lat` (float), `lon` (float), `days` (int), `model` (string, optional) |
+| `GET` | `/api/weather/by-city` | Unified city search and weather forecast | `city` (string), `days` (int), `model` (string, optional) |
+| `GET` | `/api/weather/models` | Selectable Numerical Weather Prediction models and issuing centres | None |
 | `GET` | `/api/climate/historical` | 30-year NASA POWER agro-climatological data | `lat` (float), `lon` (float) |
 | `GET` | `/api/alerts` | Active SACHET & GDACS disaster alerts | `lat`, `lon`, `state`, `district`, `active_only` |
 | `POST` | `/api/chat` | Conversational weather AI query with tool calling | Body: `{ messages: [...], session_id: string }` |

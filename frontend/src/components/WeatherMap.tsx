@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { LocationResult, NormalizedWeatherResponse, DisasterAlert } from '../types';
 import { t } from '../lib/translations';
+import { Map, MapPin } from 'lucide-react';
 
 interface WeatherMapProps {
   location: LocationResult;
@@ -38,17 +39,17 @@ export default function WeatherMap({
   const osmEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat},${lon}`;
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl space-y-4 overflow-hidden">
+    <div className="w-full glass rounded-3xl p-6 md:p-8 shadow-lg space-y-4 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-2.5">
           <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 to-emerald-500 flex items-center justify-center text-sm text-white shadow-md">
-            🗺️
+            <Map size={16} strokeWidth={2} aria-hidden="true" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">
               {t('interactiveMapTitle', currentLanguage)}
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-white/70">
               {t('interactiveMapSubtitle', currentLanguage)}
             </p>
           </div>
@@ -58,16 +59,16 @@ export default function WeatherMap({
           <button
             type="button"
             onClick={() => setZoom(Math.max(zoom - 2, 4))}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 border border-white/20 transition-colors backdrop-blur-md"
             title={t('zoomOut', currentLanguage)}
           >
             {t('zoomOut', currentLanguage)}
           </button>
-          <span className="text-slate-400">{t('zoomLevel', currentLanguage)} {zoom}</span>
+          <span className="text-white/70">{t('zoomLevel', currentLanguage)} {zoom}</span>
           <button
             type="button"
             onClick={() => setZoom(Math.min(zoom + 2, 16))}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+            className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 border border-white/20 transition-colors backdrop-blur-md"
             title={t('zoomIn', currentLanguage)}
           >
             {t('zoomIn', currentLanguage)}
@@ -76,7 +77,7 @@ export default function WeatherMap({
       </div>
 
       {/* Map Container */}
-      <div className="relative w-full h-80 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950">
+      <div className="relative w-full h-80 rounded-2xl overflow-hidden border border-white/20 bg-black/20">
         <iframe
           title={`Map of ${location.name}`}
           src={osmEmbedUrl}
@@ -85,14 +86,14 @@ export default function WeatherMap({
         />
 
         {/* Floating Location & Weather Pin Badge */}
-        <div className="absolute top-4 left-4 bg-slate-900/95 backdrop-blur-md border border-slate-700 p-3 rounded-2xl shadow-2xl flex items-center space-x-3 text-xs">
-          <div className="text-2xl">📍</div>
+        <div data-surface="dark" className="absolute top-4 left-4 bg-black/40 backdrop-blur-2xl border border-white/20 p-3 rounded-2xl shadow-2xl flex items-center space-x-3 text-xs">
+          <MapPin size={20} strokeWidth={2} className="text-rose-400" aria-hidden="true" />
           <div>
             <div className="font-bold text-white">
               {location.name}
-              {location.admin1 ? <span className="text-slate-400 font-normal">, {location.admin1}</span> : ''}
+              {location.admin1 ? <span className="text-white/70 font-normal">, {location.admin1}</span> : ''}
             </div>
-            <div className="font-mono text-[10px] text-slate-400">
+            <div className="font-mono text-[10px] text-white/70">
               {lat.toFixed(4)}°N, {lon.toFixed(4)}°E
             </div>
           </div>
@@ -112,14 +113,14 @@ export default function WeatherMap({
                 {primaryAlert.scope}
               </span>
             </div>
-            <p className="text-[11px] text-slate-200 leading-tight line-clamp-2">
+            <p className="text-[11px] text-white/90 leading-tight line-clamp-2">
               {primaryAlert.affected_area}
             </p>
           </div>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between text-[10px] font-mono text-slate-500 gap-2">
+      <div className="flex flex-wrap items-center justify-between text-[10px] font-mono text-white/50 gap-2">
         <span>{t('mapCartographyAttribution', currentLanguage)}</span>
         <span>{t('mapPrecisionAttribution', currentLanguage)}</span>
       </div>

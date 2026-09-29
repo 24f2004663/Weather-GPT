@@ -1,5 +1,7 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone as _timezone
+
+tz_utc = _timezone.utc
 from typing import List, Optional, Dict, Any, Tuple
 
 import httpx
@@ -41,9 +43,125 @@ def _normalize_coord(value: float, decimals: int = 2) -> float:
     return round(value, decimals)
 
 
-def _make_weather_cache_key(lat: float, lon: float, days: int, include_hourly: bool) -> str:
-    """Build a normalized cache key using 2dp coordinate rounding."""
-    return f"weather:{_normalize_coord(lat):.2f}:{_normalize_coord(lon):.2f}:{days}:{include_hourly}"
+# Numerical Weather Prediction models selectable through Open-Meteo. Keyed by the
+# API's model id, valued by a human-readable name and the issuing centre, so a
+# forecast can be attributed to the system that produced it.
+NWP_MODELS: Dict[str, Dict[str, str]] = {
+    "best_match": {
+        "label": "Best Match (multi-model blend)",
+        "centre": "Open-Meteo",
+        "description": "Blends the best-performing available models for the location.",
+    },
+    "gfs_seamless": {
+        "label": "GFS",
+        "centre": "NOAA NCEP (United States)",
+        "description": "Global Forecast System, 0.11-0.25 deg global deterministic.",
+    },
+    "icon_seamless": {
+        "label": "ICON",
+        "centre": "Deutscher Wetterdienst (Germany)",
+        "description": "ICOsahedral Nonhydrostatic global and nested models.",
+    },
+    "ecmwf_ifs025": {
+        "label": "ECMWF IFS",
+        "centre": "ECMWF (Europe)",
+        "description": "Integrated Forecasting System, 0.25 deg global deterministic.",
+    },
+    "gem_seamless": {
+        "label": "GEM",
+        "centre": "Environment Canada",
+        "description": "Global Environmental Multiscale model.",
+    },
+    "jma_seamless": {
+        "label": "JMA GSM/MSM",
+        "centre": "Japan Meteorological Agency",
+        "description": "Global Spectral Model with nested Meso-Scale Model.",
+    },
+    "ukmo_seamless": {
+        "label": "UKMO Unified Model",
+        "centre": "UK Met Office",
+        "description": "Unified Model global and regional configurations.",
+    },
+}
+
+DEFAULT_NWP_MODEL = "best_match"
+
+
+def normalize_model(model: Optional[str]) -> str:
+    """Maps a caller-supplied model id onto a supported one, defaulting to the blend."""
+    if not model:
+        return settings.OPEN_METEO_DEFAULT_MODEL if settings.OPEN_METEO_DEFAULT_MODEL in NWP_MODELS else DEFAULT_NWP_MODEL
+    candidate = model.strip().lower()
+    return candidate if candidate in NWP_MODELS else DEFAULT_NWP_MODEL
+
+
+def _make_weather_cache_key(
+    lat: float, lon: float, days: int, include_hourly: bool, model: str = DEFAULT_NWP_MODEL
+) -> str:
+    """
+    Build a normalized cache key using 2dp coordinate rounding.
+
+    The model is part of the key: different NWP models disagree by whole degrees for
+    the same point, so omitting it would serve one model's forecast under another
+    model's name.
+    """
+    return (
+        f"weather:{_normalize_coord(lat):.2f}:{_normalize_coord(lon):.2f}"
+        f":{days}:{include_hourly}:{model}"
+    )
+
+
+def _parse_observation_time(
+    raw_time: Optional[str],
+    utc_offset_seconds: Optional[int],
+) -> datetime:
+    """
+    Converts Open-Meteo's local observation timestamp into naive UTC.
+
+    Requests use timezone=auto, so the `current.time` value is local to the queried
+    point. Reporting datetime.utcnow() here instead would label the moment the server
+    happened to fetch as the moment the weather was observed -- a stale cache hit would
+    then carry a timestamp newer than its own data.
+    """
+    if not raw_time:
+        return datetime.utcnow()
+    try:
+        local_dt = datetime.fromisoformat(str(raw_time))
+    except ValueError:
+        return datetime.utcnow()
+    if local_dt.tzinfo is not None:
+        return local_dt.astimezone(tz_utc).replace(tzinfo=None)
+    if utc_offset_seconds is None:
+        return local_dt
+    return local_dt - timedelta(seconds=int(utc_offset_seconds))
+
+
+def _is_placeholder_location(loc: Optional[LocationResult]) -> bool:
+    """
+    True when a location carries no geocoding identity, i.e. it was built from the
+    bare-coordinate fallback rather than resolved through the geocoding API.
+    """
+    if loc is None:
+        return True
+    return loc.id is None and loc.country is None and loc.admin1 is None
+
+
+def _apply_location_meta(
+    resp: NormalizedWeatherResponse,
+    location_meta: Optional[LocationResult],
+) -> NormalizedWeatherResponse:
+    """
+    Cache entries are keyed by rounded coordinates only, so a payload cached by a
+    caller that had no geocoding metadata (e.g. the AI tool path, which only ever
+    holds lat/lon) would otherwise serve its placeholder location to every later
+    city lookup for those same coordinates. Downstream consumers read
+    location.admin1/name to target disaster alerts, so a placeholder leaking through
+    silently breaks alert targeting. Re-apply the caller's resolved metadata on
+    every cache-hit path.
+    """
+    if location_meta is not None and not _is_placeholder_location(location_meta):
+        resp.location = location_meta
+    return resp
 
 
 class OpenMeteoProvider(BaseWeatherProvider):
@@ -176,13 +294,17 @@ class OpenMeteoProvider(BaseWeatherProvider):
 
     async def get_current_weather(
         self, lat: float, lon: float,
-        location_meta: Optional[LocationResult] = None
+        location_meta: Optional[LocationResult] = None,
+        model: Optional[str] = None
     ) -> NormalizedWeatherResponse:
         """
         Fetches current weather conditions.
         Transparently satisfied from cached 7-day+hourly forecast payload where available.
         """
-        return await self.get_forecast(lat=lat, lon=lon, days=1, include_hourly=False, location_meta=location_meta)
+        return await self.get_forecast(
+            lat=lat, lon=lon, days=1, include_hourly=False,
+            location_meta=location_meta, model=model,
+        )
 
     # ------------------------------------------------------------------
     # Forecast (primary method)
@@ -194,7 +316,8 @@ class OpenMeteoProvider(BaseWeatherProvider):
         lon: float,
         days: int = 7,
         include_hourly: bool = True,
-        location_meta: Optional[LocationResult] = None
+        location_meta: Optional[LocationResult] = None,
+        model: Optional[str] = None
     ) -> NormalizedWeatherResponse:
         """
         Fetches current conditions, daily forecast, and optional hourly forecast.
@@ -203,8 +326,9 @@ class OpenMeteoProvider(BaseWeatherProvider):
             raise InvalidCoordinatesError(f"Coordinates ({lat}, {lon}) are out of valid range [-90..90, -180..180]")
 
         days_clamped = max(1, min(days, 16))
-        cache_key = _make_weather_cache_key(lat, lon, days_clamped, include_hourly)
-        canonical_key = _make_weather_cache_key(lat, lon, 7, True)
+        resolved_model = normalize_model(model)
+        cache_key = _make_weather_cache_key(lat, lon, days_clamped, include_hourly, resolved_model)
+        canonical_key = _make_weather_cache_key(lat, lon, 7, True, resolved_model)
 
         # 1. Fresh cache hit
         cached_data = await cache.get(cache_key)
@@ -212,7 +336,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
             logger.info(f"[Cache HIT fresh] ({lat},{lon}) days={days_clamped} hourly={include_hourly}")
             resp = NormalizedWeatherResponse(**cached_data)
             resp.cached = True
-            return resp
+            return _apply_location_meta(resp, location_meta)
 
         # 2. Subset reuse: serve from canonical 7-day+hourly cache
         if cache_key != canonical_key:
@@ -228,7 +352,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 if not include_hourly:
                     resp.hourly = []
                 resp.cached = True
-                return resp
+                return _apply_location_meta(resp, location_meta)
 
         # 3. In-flight deduplication
         if cache_key in _inflight_weather:
@@ -242,7 +366,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
             if cached_data is not None:
                 resp = NormalizedWeatherResponse(**cached_data)
                 resp.cached = True
-                return resp
+                return _apply_location_meta(resp, location_meta)
             if cache_key != canonical_key:
                 canonical_data = await cache.get(canonical_key)
                 if canonical_data is not None:
@@ -252,7 +376,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     if not include_hourly:
                         resp.hourly = []
                     resp.cached = True
-                    return resp
+                    return _apply_location_meta(resp, location_meta)
 
         inflight_event = asyncio.Event()
         _inflight_weather[cache_key] = inflight_event
@@ -286,14 +410,35 @@ class OpenMeteoProvider(BaseWeatherProvider):
             "uv_index_max"
         ]
 
+        # The legacy `current_weather=true` block returns only temperature, wind and
+        # weather code, which is why humidity, apparent temperature, precipitation,
+        # gusts, UV, cloud cover and pressure all read as null. The modern `current=`
+        # parameter returns each of them as a genuine present-moment observation.
+        current_vars = [
+            "temperature_2m",
+            "apparent_temperature",
+            "relative_humidity_2m",
+            "precipitation",
+            "weather_code",
+            "wind_speed_10m",
+            "wind_direction_10m",
+            "wind_gusts_10m",
+            "cloud_cover",
+            "pressure_msl",
+            "uv_index",
+            "is_day",
+        ]
+
         params: Dict[str, Any] = {
             "latitude": lat,
             "longitude": lon,
-            "current_weather": "true",
+            "current": ",".join(current_vars),
             "daily": ",".join(daily_vars),
             "forecast_days": days_clamped,
             "timezone": "auto"
         }
+        if resolved_model != DEFAULT_NWP_MODEL:
+            params["models"] = resolved_model
         if include_hourly:
             params["hourly"] = ",".join(hourly_vars)
 
@@ -307,14 +452,14 @@ class OpenMeteoProvider(BaseWeatherProvider):
 
             except httpx.TimeoutException:
                 logger.error(f"[Upstream timeout] Open-Meteo forecast ({lat},{lon}) after {self.timeout}s")
-                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, "timeout")
+                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, location_meta=location_meta, reason="timeout")
                 if stale is not None:
                     return stale
                 raise UpstreamTimeoutError(provider="Open-Meteo Forecast", timeout_seconds=self.timeout)
 
             except Exception as e:
                 logger.error(f"[Network error] Open-Meteo forecast ({lat},{lon}): {e}")
-                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, "network error")
+                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, location_meta=location_meta, reason="network error")
                 if stale is not None:
                     return stale
                 raise UpstreamProviderError(provider="Open-Meteo Forecast", status_code=None, message=str(e))
@@ -325,7 +470,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
                     f"[Upstream 429] Open-Meteo rate-limited for ({lat},{lon}). "
                     f"Retry-After: {retry_after}. Checking stale cache."
                 )
-                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, "429 rate-limit")
+                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, location_meta=location_meta, reason="429 rate-limit")
                 if stale is not None:
                     return stale
                 raise UpstreamProviderError(
@@ -339,7 +484,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
 
             if response.status_code != 200:
                 logger.error(f"[Upstream {response.status_code}] Open-Meteo forecast ({lat},{lon}): {response.text[:200]}")
-                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, f"HTTP {response.status_code}")
+                stale = await self._try_stale(cache_key, canonical_key, days_clamped, include_hourly, location_meta=location_meta, reason=f"HTTP {response.status_code}")
                 if stale is not None:
                     return stale
                 raise UpstreamProviderError(
@@ -357,6 +502,7 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 )
 
             normalized = self._normalize_open_meteo_payload(raw, lat, lon, location_meta)
+            normalized.weather_model = resolved_model
 
             await cache.set(
                 cache_key,
@@ -381,7 +527,8 @@ class OpenMeteoProvider(BaseWeatherProvider):
         canonical_key: str,
         days: int,
         include_hourly: bool,
-        reason: str
+        reason: str,
+        location_meta: Optional[LocationResult] = None
     ) -> Optional[NormalizedWeatherResponse]:
         stale_entry = await cache.get_with_stale(cache_key)
         if stale_entry is not None:
@@ -391,12 +538,12 @@ class OpenMeteoProvider(BaseWeatherProvider):
                 resp = NormalizedWeatherResponse(**value)
                 resp.cached = True
                 resp.stale = True
-                return resp
+                return _apply_location_meta(resp, location_meta)
             else:
                 logger.info(f"[Cache HIT fresh (stale-path)] key={cache_key}")
                 resp = NormalizedWeatherResponse(**value)
                 resp.cached = True
-                return resp
+                return _apply_location_meta(resp, location_meta)
 
         if cache_key != canonical_key:
             stale_canonical = await cache.get_with_stale(canonical_key)
@@ -436,27 +583,52 @@ class OpenMeteoProvider(BaseWeatherProvider):
             elevation=elevation
         )
 
-        cw_raw = raw.get("current_weather") or {}
-        w_code = int(cw_raw.get("weathercode", 0))
+        # Modern `current` block, with the legacy `current_weather` block kept as a
+        # fallback so a cached or replayed legacy payload still normalizes.
+        cw_raw = raw.get("current") or raw.get("current_weather") or {}
+
+        def _num(*keys):
+            """First present value among the modern and legacy key spellings."""
+            for k in keys:
+                v = cw_raw.get(k)
+                if v is not None:
+                    return v
+            return None
+
+        w_code_val = _num("weather_code", "weathercode")
+        w_code = int(w_code_val) if w_code_val is not None else 0
         cond_name, _, icon_key = decode_wmo_code(w_code)
 
-        temp_val = cw_raw.get("temperature")
-        wind_val = cw_raw.get("windspeed")
-        wind_dir_val = cw_raw.get("winddirection")
-        is_day_val = cw_raw.get("is_day")
+        temp_val = _num("temperature_2m", "temperature")
+        app_temp_val = _num("apparent_temperature")
+        humidity_val = _num("relative_humidity_2m", "relativehumidity_2m")
+        precip_val = _num("precipitation")
+        wind_val = _num("wind_speed_10m", "windspeed")
+        wind_dir_val = _num("wind_direction_10m", "winddirection")
+        gusts_val = _num("wind_gusts_10m")
+        cloud_val = _num("cloud_cover")
+        pressure_val = _num("pressure_msl", "surface_pressure")
+        uv_val = _num("uv_index")
+        is_day_val = _num("is_day")
 
         current = CurrentWeather(
             temperature_c=float(temp_val) if temp_val is not None else 0.0,
-            apparent_temperature_c=float(temp_val) if temp_val is not None else None,
-            humidity_percent=None,
-            precipitation_mm=None,
+            apparent_temperature_c=float(app_temp_val) if app_temp_val is not None else None,
+            humidity_percent=int(humidity_val) if humidity_val is not None else None,
+            precipitation_mm=float(precip_val) if precip_val is not None else None,
             wind_speed_kmh=float(wind_val) if wind_val is not None else None,
             wind_direction_deg=int(wind_dir_val) if wind_dir_val is not None else None,
+            wind_gusts_kmh=float(gusts_val) if gusts_val is not None else None,
             weather_code=w_code,
             weather_condition=cond_name,
             icon_key=icon_key,
             is_day=int(is_day_val) if is_day_val is not None else 1,
-            observed_time=datetime.utcnow()
+            uv_index=float(uv_val) if uv_val is not None else None,
+            cloud_cover_percent=int(cloud_val) if cloud_val is not None else None,
+            pressure_hpa=float(pressure_val) if pressure_val is not None else None,
+            observed_time=_parse_observation_time(
+                cw_raw.get("time"), raw.get("utc_offset_seconds")
+            ),
         )
 
         hourly_list: List[HourlyForecast] = []
@@ -471,13 +643,6 @@ class OpenMeteoProvider(BaseWeatherProvider):
             winds = h_raw.get("windspeed_10m") or []
             humidities = h_raw.get("relativehumidity_2m") or []
             uvs = h_raw.get("uv_index") or []
-
-            if humidities and len(humidities) > 0 and humidities[0] is not None:
-                current.humidity_percent = int(humidities[0])
-            if app_temps and len(app_temps) > 0 and app_temps[0] is not None:
-                current.apparent_temperature_c = float(app_temps[0])
-            if precips and len(precips) > 0 and precips[0] is not None:
-                current.precipitation_mm = float(precips[0])
 
             for idx, t_str in enumerate(times[:48]):
                 h_code = int(codes[idx]) if idx < len(codes) and codes[idx] is not None else 0

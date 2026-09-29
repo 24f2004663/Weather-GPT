@@ -18,6 +18,8 @@ from backend.schemas.notifications import (
     DeliveryStatus,
 )
 from backend.schemas.alerts import DisasterAlert, AlertSeverity, AlertSource, GeographicScope
+from backend.schemas.chat import ChatMessage, ChatResponse
+from backend.services.ai.gemini import gemini_ai_service
 
 
 class TestPhase2SMSEmergencyAlerts(unittest.TestCase):
@@ -276,12 +278,30 @@ class TestPhase2SMSEmergencyAlerts(unittest.TestCase):
 
     # K. Normal website chat does not trigger SMS
     def test_normal_chat_endpoint_does_not_trigger_sms(self):
-        with patch.object(notification_orchestrator, "handle_alert_event") as mock_handle:
-            response = self.client.post("/api/chat", json={
-                "messages": [{"role": "user", "content": "What is the weather in Chennai?"}]
-            })
-            self.assertEqual(response.status_code, 200)
-            mock_handle.assert_not_called()
+        """
+        The invariant under test is that an ordinary chat turn never reaches the
+        emergency dispatch path. The LLM boundary is stubbed so the assertion holds
+        without a live GEMINI_API_KEY -- previously this hit the real provider and
+        failed with 503 in any environment without credentials, which meant a red
+        suite that masked genuine regressions.
+        """
+        canned = ChatResponse(
+            response_message=ChatMessage(
+                role="assistant",
+                content="It is currently 33.4 C and clear in Chennai.",
+            ),
+            session_id="test-session",
+            tools_used=["get_current_weather"],
+        )
+
+        with patch.object(gemini_ai_service, "generate_weather_response",
+                          AsyncMock(return_value=canned)):
+            with patch.object(notification_orchestrator, "handle_alert_event") as mock_handle:
+                response = self.client.post("/api/chat", json={
+                    "messages": [{"role": "user", "content": "What is the weather in Chennai?"}]
+                })
+                self.assertEqual(response.status_code, 200)
+                mock_handle.assert_not_called()
 
     # M. SMS test endpoint uses the exact fixed test message and registered Supabase phone
     def test_sms_test_endpoint_uses_registered_phone_and_fixed_message(self):

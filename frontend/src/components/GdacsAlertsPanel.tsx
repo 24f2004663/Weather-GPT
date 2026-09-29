@@ -4,6 +4,18 @@ import React, { useEffect, useState } from 'react';
 import { DisasterAlert, AlertSeverity } from '../types';
 import { fetchGdacsTop7 } from '../lib/api';
 import { t } from '../lib/translations';
+import {
+  Wind,
+  Waves,
+  Sun,
+  Flame,
+  Mountain,
+  Activity,
+  AlertTriangle,
+  Globe,
+  MapPin,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface GdacsAlertsPanelProps {
   onAlertsLoaded?: (alerts: DisasterAlert[]) => void;
@@ -53,35 +65,39 @@ export default function GdacsAlertsPanel({ onAlertsLoaded, currentLanguage = 'en
     }
   };
 
-  const getEventEmoji = (type: string) => {
+  /** Hazard glyph for a GDACS event type. Line icons, not emoji, so they inherit the
+   *  theme's ink colour and sit on the same optical weight as the weather icons. */
+  const getEventIcon = (type: string): LucideIcon => {
     const t = type.toLowerCase();
-    if (t.includes('cyclone') || t.includes('typhoon') || t.includes('hurricane')) return '🌀';
-    if (t.includes('earthquake') || t.includes('tremor')) return '🌋';
-    if (t.includes('flood') || t.includes('inundation')) return '🌊';
-    if (t.includes('drought') || t.includes('heat')) return '☀️';
-    if (t.includes('fire') || t.includes('wildfire')) return '🔥';
-    if (t.includes('tsunami')) return '🌊';
-    if (t.includes('volcano')) return '🌋';
-    return '🚨';
+    if (t.includes('cyclone') || t.includes('typhoon') || t.includes('hurricane')) return Wind;
+    if (t.includes('earthquake') || t.includes('tremor')) return Activity;
+    if (t.includes('flood') || t.includes('inundation') || t.includes('tsunami')) return Waves;
+    if (t.includes('drought') || t.includes('heat')) return Sun;
+    if (t.includes('fire') || t.includes('wildfire')) return Flame;
+    if (t.includes('volcano')) return Mountain;
+    return AlertTriangle;
   };
 
   if (isLoading) {
     return (
-      <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 animate-pulse space-y-3">
-        <div className="h-4 bg-slate-800 rounded w-1/3"></div>
-        <div className="h-16 bg-slate-800 rounded-xl w-full"></div>
+      <div className="w-full glass rounded-3xl p-5 animate-pulse space-y-3">
+        <div className="h-4 bg-white/20 rounded w-1/3"></div>
+        <div className="h-16 bg-white/20 rounded-xl w-full"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 text-xs text-slate-400 flex items-center justify-between">
-        <span>🌐 {t('disasterFeedError', currentLanguage)} ({error})</span>
+      <div className="w-full glass rounded-3xl p-5 text-xs text-white/70 flex items-center justify-between">
+        <span className="inline-flex items-center gap-1.5">
+          <Globe size={14} strokeWidth={1.75} aria-hidden="true" />
+          {t('disasterFeedError', currentLanguage)} ({error})
+        </span>
         <button
           type="button"
           onClick={loadGdacs}
-          className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors"
+          className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-white/90 font-medium transition-colors backdrop-blur-md"
         >
           {t('retry', currentLanguage)}
         </button>
@@ -90,23 +106,23 @@ export default function GdacsAlertsPanel({ onAlertsLoaded, currentLanguage = 'en
   }
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-xl space-y-4">
+    <div className="w-full glass rounded-3xl p-5 md:p-6 shadow-lg space-y-4">
       {/* Panel Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-2.5">
-          <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-sm shadow-md text-white">
-            🌐
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-md text-[#fff]">
+            <Globe size={16} strokeWidth={2} aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                 {t('gdacsTitle', currentLanguage)}
               </h3>
-              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-950 text-slate-300 border border-slate-800">
+              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/10 text-white/80 border border-white/20">
                 {t('gdacsFeed', currentLanguage)}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-white/70">
               {t('gdacsSubtitle', currentLanguage)}
             </p>
           </div>
@@ -123,10 +139,16 @@ export default function GdacsAlertsPanel({ onAlertsLoaded, currentLanguage = 'en
           {alerts.map((alert, idx) => (
             <div
               key={alert.alert_id}
-              className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-slate-700 transition-all flex flex-wrap items-start justify-between gap-3"
+              className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors flex flex-wrap items-start justify-between gap-3 backdrop-blur-md"
             >
               <div className="flex items-start space-x-3 flex-1 min-w-[240px]">
-                <div className="text-xl pt-0.5">{getEventEmoji(alert.event_type)}</div>
+                <div className="pt-0.5 text-ink/80">
+                  {React.createElement(getEventIcon(alert.event_type), {
+                    size: 20,
+                    strokeWidth: 1.75,
+                    'aria-hidden': true,
+                  })}
+                </div>
                 <div className="space-y-1">
                   <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                     <span className="text-xs font-mono font-bold text-sky-400">#{idx + 1}</span>
@@ -136,16 +158,17 @@ export default function GdacsAlertsPanel({ onAlertsLoaded, currentLanguage = 'en
                     <span className="text-xs font-bold text-white">
                       {alert.event_type}
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400">
-                      📍 {alert.affected_area}
+                    <span className="text-[10px] font-mono text-white/70 inline-flex items-center gap-1">
+                      <MapPin size={11} strokeWidth={2} aria-hidden="true" />
+                      {alert.affected_area}
                     </span>
                   </div>
 
-                  <h4 className="text-xs font-semibold text-slate-200 leading-snug">
+                  <h4 className="text-xs font-semibold text-white/90 leading-snug">
                     {alert.title}
                   </h4>
 
-                  <div className="flex items-center space-x-3 text-[10px] text-slate-500 font-mono">
+                  <div className="flex items-center space-x-3 text-[10px] text-white/50 font-mono">
                     {alert.issued_time && (
                       <span>{t('issuedLabel', currentLanguage)} {new Date(alert.issued_time).toLocaleDateString()}</span>
                     )}
@@ -170,13 +193,13 @@ export default function GdacsAlertsPanel({ onAlertsLoaded, currentLanguage = 'en
           ))}
         </div>
       ) : (
-        <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 font-mono text-center">
+        <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-xs text-white/70 font-mono text-center backdrop-blur-md">
           {t('noGdacsAlerts', currentLanguage)}
         </div>
       )}
 
       {/* Attribution Footer */}
-      <div className="pt-1 text-[10px] text-slate-500 font-mono text-right border-t border-slate-800/60">
+      <div className="pt-1 text-[10px] text-white/50 font-mono text-right border-t border-white/10">
         {t('gdacsSource', currentLanguage)}
       </div>
     </div>

@@ -37,11 +37,37 @@ class Settings(BaseSettings):
     ALERT_CACHE_TTL_SECONDS: int = Field(default=300, env="ALERT_CACHE_TTL_SECONDS")          # 5 mins (fresh)
     ALERT_STALE_CACHE_TTL_SECONDS: int = Field(default=900, env="ALERT_STALE_CACHE_TTL_SECONDS") # 15 mins (stale fallback for emergencies)
 
+    # SACHET CAP detail enrichment.
+    # The RSS index carries only title/link/pubDate; severity, urgency, expiry,
+    # official instructions and structured areaDesc live in the per-alert CAP XML
+    # behind each item's <link>. A CAP document is immutable for a given
+    # identifier, so it is cached far longer than the index itself.
+    SACHET_CAP_ENRICH_ENABLED: bool = Field(default=True, env="SACHET_CAP_ENRICH_ENABLED")
+    SACHET_CAP_MAX_CONCURRENCY: int = Field(default=8, env="SACHET_CAP_MAX_CONCURRENCY")
+    SACHET_CAP_TIMEOUT_SECONDS: float = Field(default=10.0, env="SACHET_CAP_TIMEOUT_SECONDS")
+    SACHET_CAP_DETAIL_TTL_SECONDS: int = Field(default=21600, env="SACHET_CAP_DETAIL_TTL_SECONDS")  # 6 hours
+
     # Weather & Feed URLs
     OPEN_METEO_BASE_URL: str = Field(default="https://api.open-meteo.com/v1", env="OPEN_METEO_BASE_URL")
     OPEN_METEO_GEOCODING_URL: str = Field(default="https://geocoding-api.open-meteo.com/v1/search", env="OPEN_METEO_GEOCODING_URL")
     NASA_POWER_BASE_URL: str = Field(default="https://power.larc.nasa.gov/api/temporal/climatology/point", env="NASA_POWER_BASE_URL")
     SACHET_NDMA_ALERT_FEED_URL: str = Field(default="https://sachet.ndma.gov.in/cap_public_website/rss/rss_india.xml", env="SACHET_NDMA_ALERT_FEED_URL")
+
+    # Reverse geocoding (coordinates -> place name). Open-Meteo's geocoding API is
+    # forward-only, so this uses Nominatim, whose usage policy requires a descriptive
+    # User-Agent and roughly one request per second — hence the long cache TTL.
+    NOMINATIM_REVERSE_URL: str = Field(default="https://nominatim.openstreetmap.org/reverse", env="NOMINATIM_REVERSE_URL")
+    REVERSE_GEOCODE_USER_AGENT: str = Field(
+        default="WeatherGPT/0.7 (SIH26068 disaster alert prototype)",
+        env="REVERSE_GEOCODE_USER_AGENT",
+    )
+    REVERSE_GEOCODE_TIMEOUT_SECONDS: float = Field(default=8.0, env="REVERSE_GEOCODE_TIMEOUT_SECONDS")
+    REVERSE_GEOCODE_CACHE_TTL_SECONDS: int = Field(default=604800, env="REVERSE_GEOCODE_CACHE_TTL_SECONDS")  # 7 days
+
+    # Numerical Weather Prediction model selection. Open-Meteo blends several NWP
+    # sources under "best_match"; naming a model pins the forecast to that single
+    # global model so a forecast can be attributed to the system that produced it.
+    OPEN_METEO_DEFAULT_MODEL: str = Field(default="best_match", env="OPEN_METEO_DEFAULT_MODEL")
 
     # Primary LLM Provider & Multi-Model Quota Router
     GEMINI_API_KEY: Optional[str] = Field(default=None, env="GEMINI_API_KEY")

@@ -7,15 +7,26 @@ export const metadata: Metadata = {
     'Next-generation meteorological intelligence, hyper-local forecasts, and official disaster safety advisories powered by Google Gemini and Open-Meteo.',
   keywords: ['weather', 'forecast', 'ai weather', 'climate', 'disaster alerts', 'gemini', 'open-meteo'],
   authors: [{ name: 'WeatherGPT Team' }],
+  manifest: '/manifest.json',
+  applicationName: 'WeatherGPT',
+  appleWebApp: {
+    capable: true,
+    title: 'WeatherGPT',
+    statusBarStyle: 'black-translucent',
+  },
   icons: {
-    icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌤️</text></svg>',
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
   },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#0f172a',
+  themeColor: '#18181b',
 };
 
 export default function RootLayout({
@@ -25,7 +36,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-sky-500 selection:text-white">
+      <body className="bg-zinc-950 text-ink min-h-screen font-sans selection:bg-sky-500 selection:text-[#fff]">
         {children}
       </body>
     </html>

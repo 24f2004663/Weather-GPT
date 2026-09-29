@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { DisasterAlert, LocationResult, AlertSeverity } from '../types';
 import { t } from '../lib/translations';
+import { Siren, AlertTriangle } from 'lucide-react';
 
 interface DisasterAlertBannerProps {
   alerts: DisasterAlert[] | null;
@@ -25,18 +26,18 @@ export default function DisasterAlertBanner({
 
   if (isLoading) {
     return (
-      <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 animate-pulse space-y-3">
-        <div className="h-4 bg-slate-800 rounded w-1/3"></div>
-        <div className="h-10 bg-slate-800 rounded-xl w-full"></div>
+      <div className="w-full glass rounded-3xl p-5 animate-pulse space-y-3">
+        <div className="h-4 bg-white/20 rounded w-1/3"></div>
+        <div className="h-10 bg-white/20 rounded-xl w-full"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="w-full bg-amber-950/40 border border-amber-800/80 rounded-3xl p-5 text-xs text-amber-200 flex items-center justify-between shadow-lg">
+      <div data-surface="dark" className="w-full bg-black/40 backdrop-blur-2xl border border-white/20 rounded-3xl p-5 text-xs text-amber-200 flex items-center justify-between shadow-lg">
         <div className="flex items-center space-x-3">
-          <span className="text-xl">⚠️</span>
+          <AlertTriangle size={20} strokeWidth={2} aria-hidden="true" />
           <div>
             <div className="font-bold text-amber-300">{t('disasterFeedNotice', currentLanguage)}</div>
             <div>{t('disasterFeedError', currentLanguage)} ({error})</div>
@@ -74,23 +75,23 @@ export default function DisasterAlertBanner({
   };
 
   return (
-    <div className="w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-xl space-y-4">
+    <div className="w-full glass rounded-3xl p-5 md:p-6 shadow-lg space-y-4">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center space-x-2.5">
           <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center text-sm shadow-md shadow-amber-500/20 text-white">
-            🚨
+            <Siren size={16} strokeWidth={2} aria-hidden="true" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                 {t('disasterWatchTitle', currentLanguage)}
               </h3>
-              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-950 text-slate-300 border border-slate-800">
+              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-white/10 text-white/80 border border-white/20">
                 {t('sachetNdmaFeeds', currentLanguage)}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-white/70">
               {t('sachetNdmaSubtitle', currentLanguage)}
             </p>
           </div>
@@ -111,7 +112,7 @@ export default function DisasterAlertBanner({
             return (
               <div
                 key={alert.alert_id}
-                className="p-4 rounded-2xl bg-slate-950/80 border border-rose-900/60 shadow-lg space-y-2.5 transition-all"
+                className="p-4 rounded-2xl bg-white/5 backdrop-blur-md border border-rose-500/40 shadow-lg space-y-2.5 transition-colors"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="space-y-0.5">
@@ -122,7 +123,7 @@ export default function DisasterAlertBanner({
                       <span className="text-xs font-bold text-white">
                         {alert.event_type}
                       </span>
-                      <span className="text-[10px] font-mono text-slate-500">
+                      <span className="text-[10px] font-mono text-white/50">
                         [{alert.scope} {t('levelLabel', currentLanguage)}]
                       </span>
                     </div>
@@ -140,35 +141,35 @@ export default function DisasterAlertBanner({
                   </button>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className="text-xs text-white/80 leading-relaxed">
                   {alert.headline || alert.description}
                 </p>
 
                 {/* Expanded Bulletin Details */}
                 {isExpanded && (
-                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2 text-xs">
+                  <div className="mt-3 pt-3 border-t border-white/20 space-y-2 text-xs">
                     {alert.instruction && (
-                      <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-amber-200">
+                      <div className="p-3 bg-black/20 border border-white/10 rounded-xl text-amber-200">
                         <strong className="text-amber-400">{t('safetyInstructionLabel', currentLanguage)}</strong>
                         <p className="mt-1 leading-relaxed">{alert.instruction}</p>
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400 font-mono bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-white/70 font-mono bg-black/20 p-2.5 rounded-xl border border-white/10">
                       <div>
-                        <span className="text-slate-500">{t('affectedArea', currentLanguage)}</span> {alert.affected_area}
+                        <span className="text-white/50">{t('affectedArea', currentLanguage)}</span> {alert.affected_area}
                       </div>
                       <div>
-                        <span className="text-slate-500">{t('urgency', currentLanguage)}</span> {alert.urgency} ({alert.certainty})
+                        <span className="text-white/50">{t('urgency', currentLanguage)}</span> {alert.urgency} ({alert.certainty})
                       </div>
                       {alert.effective_time && (
                         <div>
-                          <span className="text-slate-500">{t('effective', currentLanguage)}</span> {new Date(alert.effective_time).toLocaleString()}
+                          <span className="text-white/50">{t('effective', currentLanguage)}</span> {new Date(alert.effective_time).toLocaleString()}
                         </div>
                       )}
                       {alert.expires_time && (
                         <div>
-                          <span className="text-slate-500">{t('expires', currentLanguage)}</span> {new Date(alert.expires_time).toLocaleString()}
+                          <span className="text-white/50">{t('expires', currentLanguage)}</span> {new Date(alert.expires_time).toLocaleString()}
                         </div>
                       )}
                     </div>
@@ -193,15 +194,15 @@ export default function DisasterAlertBanner({
         </div>
       ) : (
         /* Empty / All Clear State */
-        <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center space-x-2 text-slate-300">
+        <div className="p-4 rounded-2xl glass-inset flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-2 text-white/80">
             <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
             <span>
               {t('noActiveAlertsForLocation', currentLanguage)}{' '}
               <strong className="text-white">{location?.name || ''}</strong>.
             </span>
           </div>
-          <span className="text-[10px] text-slate-500 font-mono hidden sm:inline-block">
+          <span className="text-[10px] text-white/50 font-mono hidden sm:inline-block">
             {t('feedSyncedSachet', currentLanguage)}
           </span>
         </div>

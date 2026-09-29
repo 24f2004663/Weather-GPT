@@ -78,4 +78,10 @@ class NormalizedWeatherResponse(BaseModel):
     cached: bool = False
     stale: bool = False  # True when served from stale cache after upstream failure
     retrieved_at: datetime = Field(default_factory=datetime.utcnow)
+    weather_model: str = Field(
+        default="best_match",
+        description="Numerical Weather Prediction model backing this forecast. "
+                    "'best_match' is Open-Meteo's blend of the best-performing models "
+                    "for the location; any other value pins a single named NWP system.",
+    )
 
