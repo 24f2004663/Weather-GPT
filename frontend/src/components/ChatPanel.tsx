@@ -350,7 +350,7 @@ export default function ChatPanel({
                   : 'bg-white/10 backdrop-blur-md text-white border border-white/20 rounded-bl-none'
               }`}
             >
-              <div className="prose prose-sm prose-invert max-w-none prose-p:leading-relaxed prose-headings:text-sky-300 prose-a:text-sky-400 prose-strong:text-white marker:text-sky-400">
+              <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap prose-p:leading-relaxed prose-headings:text-sky-300 prose-a:text-sky-400 prose-strong:text-white marker:text-sky-400">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {msg.content}
                 </ReactMarkdown>
