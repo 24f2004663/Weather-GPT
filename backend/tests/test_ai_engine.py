@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from backend.main import app
 from backend.services.ai.gemini import GeminiAIService
+from backend.services.ai.router import gemini_model_router
 from backend.services.ai.session import SessionStore, session_store
 from backend.services.ai.tools import (
     execute_weather_tool,
@@ -32,6 +33,10 @@ class TestAIEngine(unittest.TestCase):
         self.client = TestClient(app)
         self.ai_service = GeminiAIService(api_key="mock_test_key", model="gemini-1.5-pro", timeout=2.0)
         asyncio.run(session_store.clear_session("test_session"))
+        asyncio.run(gemini_model_router.reset_state())
+
+    def tearDown(self):
+        asyncio.run(gemini_model_router.reset_state())
 
     # 1. Missing Gemini configuration -> 503
     def test_missing_gemini_config_error(self):

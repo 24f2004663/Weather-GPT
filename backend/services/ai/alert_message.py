@@ -91,7 +91,11 @@ async def generate_alert_message(alert: DisasterAlert, language: str = "en") -> 
             for model_name in cascade:
                 clean_model = model_name.replace("models/", "").strip()
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
-                res = await client.post(url, json=payload)
+                try:
+                    res = await client.post(url, json=payload)
+                except Exception as ex:
+                    logger.warning(f"[Gemini Alert] Exception calling {clean_model}: {str(ex)}, trying next model in cascade")
+                    continue
                 if res.status_code == 200:
                     data = res.json()
                     candidates = data.get("candidates", [])

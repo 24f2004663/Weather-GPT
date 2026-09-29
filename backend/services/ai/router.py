@@ -208,6 +208,22 @@ class GeminiModelRouter:
             if model_name in self._rpd_counts and self._rpd_counts[model_name] > 0:
                 self._rpd_counts[model_name] -= 1
 
+    async def record_timeout(self, model_name: str, estimated_tokens: int = 1000):
+        """
+        Marks model as temporarily suppressed after timeout and releases quota reservation.
+        """
+        now = time.time()
+        suppress_duration = settings.GEMINI_429_SUPPRESS_SECONDS
+        async with self._lock:
+            if model_name in self._rpm_timestamps and self._rpm_timestamps[model_name]:
+                self._rpm_timestamps[model_name].pop()
+            if model_name in self._tpm_records and self._tpm_records[model_name]:
+                self._tpm_records[model_name].pop()
+            if model_name in self._rpd_counts and self._rpd_counts[model_name] > 0:
+                self._rpd_counts[model_name] -= 1
+            self._suppressed_until[model_name] = now + suppress_duration
+            logger.warning(f"[Gemini Router] model={model_name} event=timeout action=suppress_and_release (suppressed for {suppress_duration}s)")
+
     async def reset_state(self):
         """Resets all tracking state for test isolation."""
         async with self._lock:

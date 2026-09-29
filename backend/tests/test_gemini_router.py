@@ -449,5 +449,95 @@ class TestGeminiMultiModelRouter(unittest.TestCase):
         # Model 2 took over and succeeded
         self.assertEqual(status["gemma-4-26b-a4b-it"]["current_rpm"], 1)
 
+    # -----------------------------------------------------------------------
+    # Test 19: Model 1 timeout triggers fallback to Model 2
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_model_1_timeout_cascades_to_model_2(self, mock_get_client):
+        import httpx
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Primary model (gemma-4-31b-it) raises httpx.ReadTimeout
+        timeout_err = httpx.ReadTimeout("The read operation timed out")
+        # Secondary model (gemma-4-26b-a4b-it) succeeds with 200 OK
+        resp_200 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "Resolved via Model 2 after Model 1 timeout."}], "role": "model"}}]
+        })
+
+        mock_client.post.side_effect = [timeout_err, resp_200]
+
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Timeout test 1")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        self.assertIn("Model 2 after Model 1 timeout", res.response_message.content)
+        status = asyncio.run(gemini_model_router.get_status())
+        # Model 1 was suppressed and its reservation released (current_rpm=0)
+        self.assertTrue(status["gemma-4-31b-it"]["is_429_suppressed"])
+        self.assertEqual(status["gemma-4-31b-it"]["current_rpm"], 0)
+        # Model 2 took over and succeeded
+        self.assertEqual(status["gemma-4-26b-a4b-it"]["current_rpm"], 1)
+
+    # -----------------------------------------------------------------------
+    # Test 20: Model 1 timeout + Model 2 timeout -> Model 3 succeeds
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_model_1_and_2_timeout_cascades_to_model_3_success(self, mock_get_client):
+        import httpx
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # Model 1 and Model 2 raise TimeoutException
+        timeout_1 = httpx.TimeoutException("Model 1 timed out")
+        timeout_2 = httpx.TimeoutException("Model 2 timed out")
+        # Model 3 (gemini-3.1-flash-lite) succeeds with 200 OK
+        resp_200 = MagicMock(status_code=200, json=lambda: {
+            "candidates": [{"content": {"parts": [{"text": "Answer from tier 3: gemini-3.1-flash-lite."}], "role": "model"}}]
+        })
+
+        mock_client.post.side_effect = [timeout_1, timeout_2, resp_200]
+
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="Tier 3 timeout test")])
+        res = asyncio.run(service.generate_weather_response(req))
+
+        self.assertIn("gemini-3.1-flash-lite", res.response_message.content)
+        status = asyncio.run(gemini_model_router.get_status())
+        self.assertTrue(status["gemma-4-31b-it"]["is_429_suppressed"])
+        self.assertEqual(status["gemma-4-31b-it"]["current_rpm"], 0)
+        self.assertTrue(status["gemma-4-26b-a4b-it"]["is_429_suppressed"])
+        self.assertEqual(status["gemma-4-26b-a4b-it"]["current_rpm"], 0)
+        self.assertEqual(status["gemini-3.1-flash-lite"]["current_rpm"], 1)
+
+    # -----------------------------------------------------------------------
+    # Test 21: All 3 models timeout -> returns final UpstreamTimeoutError
+    # -----------------------------------------------------------------------
+    @patch("backend.core.http_client.http_client_manager.get_client")
+    def test_all_3_models_timeout_returns_upstream_timeout_error(self, mock_get_client):
+        import httpx
+        from backend.core.errors import UpstreamTimeoutError
+        mock_client = AsyncMock()
+        mock_get_client.return_value = mock_client
+
+        # All 3 models raise TimeoutException
+        mock_client.post.side_effect = [
+            httpx.TimeoutException("Model 1 timeout"),
+            httpx.TimeoutException("Model 2 timeout"),
+            httpx.TimeoutException("Model 3 timeout"),
+        ]
+
+        service = GeminiAIService(api_key="mock_key")
+        req = ChatRequest(messages=[ChatMessage(role="user", content="All timeout test")])
+
+        with self.assertRaises(UpstreamTimeoutError) as ctx:
+            asyncio.run(service.generate_weather_response(req))
+
+        self.assertIn("timed out", str(ctx.exception).lower())
+        status = asyncio.run(gemini_model_router.get_status())
+        self.assertTrue(status["gemma-4-31b-it"]["is_429_suppressed"])
+        self.assertTrue(status["gemma-4-26b-a4b-it"]["is_429_suppressed"])
+        self.assertTrue(status["gemini-3.1-flash-lite"]["is_429_suppressed"])
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,6 @@
 import time
 import json
+import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Set, Tuple
 import httpx
@@ -110,6 +111,7 @@ class GeminiAIService(BaseAIService):
 
             response = None
             selected_model_config = None
+            last_timeout_model: Optional[str] = None
 
             # Fallback cascade loop for the current tool iteration if temporary/upstream error occurs
             max_model_fallbacks = len(gemini_model_router._models)
@@ -121,6 +123,11 @@ class GeminiAIService(BaseAIService):
 
                 if selection is None:
                     logger.error(f"[Gemini API] All models exhausted on tool_iteration={iteration}")
+                    if last_timeout_model:
+                        raise UpstreamTimeoutError(
+                            provider=f"Gemini API ({last_timeout_model})",
+                            timeout_seconds=self.timeout
+                        )
                     raise UpstreamProviderError(
                         provider="Gemini API",
                         status_code=429,
@@ -147,12 +154,17 @@ class GeminiAIService(BaseAIService):
 
                 try:
                     response = await client.post(endpoint, headers=headers, json=body, timeout=self.timeout)
-                except httpx.TimeoutException:
+                except (httpx.TimeoutException, asyncio.TimeoutError):
                     logger.error(f"[Gemini API Timeout] Model {clean_model} timed out after {self.timeout}s on iteration {iteration}")
-                    raise UpstreamTimeoutError(provider=f"Gemini API ({clean_model})", timeout_seconds=self.timeout)
+                    last_timeout_model = clean_model
+                    await gemini_model_router.record_timeout(selected_model_config.name, estimated_tokens=estimated_tokens)
+                    excluded_models_for_request.add(selected_model_config.name)
+                    continue
                 except Exception as e:
                     logger.error(f"[Gemini API Network Error] Model {clean_model}: {str(e)}")
-                    raise UpstreamProviderError(provider=f"Gemini API ({clean_model})", status_code=None, message=str(e))
+                    await gemini_model_router.record_timeout(selected_model_config.name, estimated_tokens=estimated_tokens)
+                    excluded_models_for_request.add(selected_model_config.name)
+                    continue
 
                 if response.status_code in (400, 404, 429) or response.status_code >= 500:
                     err_snippet = response.text[:200] if response.text else ""
@@ -169,8 +181,20 @@ class GeminiAIService(BaseAIService):
                 )
                 break  # Successful non-error response received
 
-            if response is None or response.status_code in (400, 404, 429) or response.status_code >= 500:
-                final_status = response.status_code if response else 503
+            if response is None:
+                if last_timeout_model:
+                    raise UpstreamTimeoutError(
+                        provider=f"Gemini API ({last_timeout_model})",
+                        timeout_seconds=self.timeout
+                    )
+                raise UpstreamProviderError(
+                    provider="Gemini API",
+                    status_code=503,
+                    message="WeatherGPT AI service reached capacity/upstream limits across all configured models. Please retry in 1 minute."
+                )
+
+            if response.status_code in (400, 404, 429) or response.status_code >= 500:
+                final_status = response.status_code
                 raise UpstreamProviderError(
                     provider="Gemini API",
                     status_code=final_status,
