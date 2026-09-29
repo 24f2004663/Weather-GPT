@@ -68,6 +68,16 @@ class TestBuildSystemInstruction(unittest.TestCase):
         self.assertIn("answer in English", instruction)
         self.assertNotIn("same language the user wrote", instruction)
 
+    def test_english_directive_covers_romanized_input(self):
+        """
+        Regression: with only "answer in English even when the user writes in another
+        language", a Hinglish question still came back in Hinglish — the model does not
+        treat Latin-script Hindi as another language. Romanized input is named outright.
+        """
+        instruction = build_system_instruction("en")
+        self.assertIn("Hinglish", instruction)
+        self.assertIn("Latin letters", instruction)
+
     def test_english_directive_is_not_self_contradictory(self):
         """The parameterised template renders "must all be in English. Do not leave them
         in English." when the target IS English, so English has its own wording."""

@@ -113,6 +113,7 @@ The user has selected English as their interface language. Write your ENTIRE res
 - Where a place has a common local name, you may give it once with the English name in parentheses.
 - Do NOT translate official SACHET/NDMA emergency instructions. Reproduce official warning text exactly as issued by the agency; if only a regional-language version exists, quote it as issued and summarise it in English alongside.
 - This applies even when the user writes to you in another language: answer in English.
+- It applies to romanized input too. Hinglish, and Tamil/Telugu/Bengali/Marathi written in Latin letters, are NOT English -- a question like "Bhai Mumbai mein aaj baarish hogi kya?" must be answered in standard English, not mirrored back in romanized Hindi. Match the user's register (a casual question deserves a warm, direct answer) but never their language.
 """
 
 _LANGUAGE_DIRECTIVE_TEMPLATE = """
