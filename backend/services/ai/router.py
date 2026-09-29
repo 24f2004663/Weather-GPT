@@ -59,32 +59,44 @@ class GeminiModelRouter:
 
     def _build_model_registry(self) -> List[GeminiModelConfig]:
         """Loads model registry in strict priority order from configuration."""
-        return [
+        registry = [
             GeminiModelConfig(
                 name=settings.GEMINI_MODEL_1,
-                display_name="Gemma 4 31B-IT",
+                display_name="Gemini 3.5 Flash Lite",
                 priority=1,
+                safe_rpm=settings.GEMINI_3_5_FLASH_LITE_SAFE_RPM,
+                safe_rpd=settings.GEMINI_3_5_FLASH_LITE_SAFE_RPD,
+                safe_tpm=settings.GEMINI_3_5_FLASH_LITE_SAFE_TPM,
+            ),
+            GeminiModelConfig(
+                name=settings.GEMINI_MODEL_2,
+                display_name="Gemma 4 31B-IT",
+                priority=2,
                 safe_rpm=settings.GEMMA_4_31B_SAFE_RPM,
                 safe_rpd=settings.GEMMA_4_31B_SAFE_RPD,
                 safe_tpm=settings.GEMMA_4_31B_SAFE_TPM,
             ),
             GeminiModelConfig(
-                name=settings.GEMINI_MODEL_2,
+                name=settings.GEMINI_MODEL_3,
                 display_name="Gemma 4 26B-A4B-IT",
-                priority=2,
+                priority=3,
                 safe_rpm=settings.GEMMA_4_26B_SAFE_RPM,
                 safe_rpd=settings.GEMMA_4_26B_SAFE_RPD,
                 safe_tpm=settings.GEMMA_4_26B_SAFE_TPM,
             ),
-            GeminiModelConfig(
-                name=settings.GEMINI_MODEL_3,
-                display_name="Gemini 3.1 Flash Lite",
-                priority=3,
-                safe_rpm=settings.GEMINI_FLASH_LITE_SAFE_RPM,
-                safe_rpd=settings.GEMINI_FLASH_LITE_SAFE_RPD,
-                safe_tpm=settings.GEMINI_FLASH_LITE_SAFE_TPM,
-            ),
         ]
+        if getattr(settings, "GEMINI_MODEL_4", None):
+            registry.append(
+                GeminiModelConfig(
+                    name=settings.GEMINI_MODEL_4,
+                    display_name="Gemini 3.1 Flash Lite",
+                    priority=4,
+                    safe_rpm=settings.GEMINI_FLASH_LITE_SAFE_RPM,
+                    safe_rpd=settings.GEMINI_FLASH_LITE_SAFE_RPD,
+                    safe_tpm=settings.GEMINI_FLASH_LITE_SAFE_TPM,
+                )
+            )
+        return registry
 
     def reload_registry(self):
         """Re-initializes model registry from settings if configuration changes."""

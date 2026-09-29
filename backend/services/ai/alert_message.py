@@ -63,7 +63,7 @@ async def generate_alert_message(alert: DisasterAlert, language: str = "en") -> 
     try:
         api_key = settings.GEMINI_API_KEY.strip()
         models_to_try = [settings.GEMINI_MODEL]
-        for attr in ("GEMINI_MODEL_1", "GEMINI_MODEL_2", "GEMINI_MODEL_3"):
+        for attr in ("GEMINI_MODEL_1", "GEMINI_MODEL_2", "GEMINI_MODEL_3", "GEMINI_MODEL_4"):
             val = getattr(settings, attr, None)
             if isinstance(val, str) and val.strip():
                 models_to_try.append(val.strip())
